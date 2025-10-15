@@ -3,32 +3,28 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Shahroz’s Dash</title>
-<meta name="description" content="A tiny, working arcade game. Move left/right, dodge blocks, grab stars. Created by Shahroz Khan.">
+<title>Shahroz’s Mini Mario Run</title>
+<meta name="description" content="Simple one-button runner: jump over pipes, stomp goombas, grab coins. Created by Shahroz Khan.">
 <style>
   :root{
-    --bg1:#0b0f24; --bg2:#141a3a; --panel:#ffffff16; --glow:#6cf; --accent:#7cffc4; --warn:#ff6b6b; --text:#eaf1ff;
+    --sky:#8fd3ff; --ground:#6ab04c; --dirt:#3d7a2f; --ui:#0b0f24; --panel:#ffffff22;
   }
   *{box-sizing:border-box}
-  html,body{height:100%;margin:0;background:linear-gradient(135deg,var(--bg1),var(--bg2));color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;touch-action:manipulation;overscroll-behavior:none}
-  .wrap{max-width:520px;margin:0 auto;padding:12px}
-  #game{display:block;width:100%;height:auto;background:#0b0f24;border:1px solid #ffffff22;border-radius:16px;box-shadow:0 16px 46px rgba(0,0,0,.55)}
-  .hud{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:8px 0}
-  .pill{background:var(--panel);border:1px solid #ffffff26;border-radius:14px;padding:8px 12px;font-weight:800}
-  .btn{appearance:none;border:none;cursor:pointer;background:linear-gradient(135deg,#7cffc4,#6cf);color:#102;border-radius:14px;padding:10px 14px;font-weight:900;box-shadow:0 10px 24px rgba(0,0,0,.35)}
-  .btn:active{transform:scale(.98)}
-  .credit{opacity:.85;text-align:center;font-size:12px;margin-top:6px}
-  /* Overlay */
-  #overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0a0c20cc;backdrop-filter:blur(8px);z-index:10}
-  .panel{background:#0c1128;border:1px solid #ffffff26;border-radius:16px;padding:18px;width:min(92vw,480px);text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.6)}
-  h1{margin:0 0 6px}
-  .muted{opacity:.9}
-  .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:12px}
-  /* Touch controls (big left/right pads) */
-  .pads{display:flex;gap:10px;margin-top:8px}
-  .pad{flex:1;background:#00000040;border:1px solid #ffffff22;border-radius:12px;padding:10px 0}
-  .pad span{opacity:.9}
-  @media (min-width:800px){ .pads{display:none} } /* hide pads on desktop */
+  html,body{height:100%;margin:0;background:var(--ui);color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif}
+  .wrap{max-width:720px;margin:0 auto;padding:10px}
+  .hud{display:flex;justify-content:space-between;gap:8px;margin:8px 0}
+  .pill{background:#00000040;border:1px solid var(--panel);border-radius:12px;padding:8px 12px;font-weight:900}
+  #game{
+    display:block;width:100%;height:auto;background:linear-gradient(#6ec9ff,#8fd3ff);
+    border:1px solid #ffffff2a;border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.55)
+  }
+  .tip{opacity:.9;text-align:center;font-size:12px;margin-top:6px}
+  .credit{opacity:.85;text-align:center;font-size:12px;margin-top:4px}
+  .btn{appearance:none;border:none;cursor:pointer;background:#ffd166;color:#2b2110;border-radius:12px;padding:8px 12px;font-weight:900}
+  /* touch: big tap zone */
+  @media (pointer:coarse){
+    #game{touch-action:manipulation}
+  }
 </style>
 </head>
 <body>
@@ -36,228 +32,304 @@
     <div class="hud">
       <div class="pill">Score: <span id="score">0</span></div>
       <div class="pill">Best: <span id="best">0</span></div>
-      <button class="btn" id="start">Start / Restart</button>
+      <button class="btn" id="restart">Restart</button>
     </div>
-
-    <canvas id="game" width="420" height="680" aria-label="Shahroz’s Dash game"></canvas>
-
-    <div class="pads">
-      <div class="pad" id="padL"><center><span>⬅️ LEFT</span></center></div>
-      <div class="pad" id="padR"><center><span>➡️ RIGHT</span></center></div>
-    </div>
-
-    <div class="credit">Created by <b>Shahroz Khan</b> • Tap left/right pads on phone or use ← → keys</div>
-  </div>
-
-  <!-- Overlay (shown on first load & on game over) -->
-  <div id="overlay">
-    <div class="panel">
-      <h1>Shahroz’s Dash</h1>
-      <p class="muted">Move left/right. Dodge the red blocks. Grab ⭐ stars for points. Speed slowly increases.</p>
-      <div class="row">
-        <button class="btn" id="play">Play</button>
-      </div>
-      <p class="muted" style="margin-top:6px">Mobile: tap LEFT/RIGHT pads • Desktop: use arrow keys</p>
-    </div>
+    <!-- Fixed logical size for reliability; scales visually -->
+    <canvas id="game" width="640" height="360" aria-label="Shahroz’s Mini Mario Run"></canvas>
+    <div class="tip">Tap / Click / Space / ↑ to JUMP • Jump on enemies to defeat them • Avoid pipes • Grab coins ⭐</div>
+    <div class="credit">Created by <b>Shahroz Khan</b></div>
   </div>
 
 <script>
 (() => {
-  // ===== Basic canvas setup (crisp & responsive) =====
   const cv = document.getElementById('game');
   const ctx = cv.getContext('2d');
   const scoreEl = document.getElementById('score');
   const bestEl  = document.getElementById('best');
-  const startBtn= document.getElementById('start');
-  const overlay = document.getElementById('overlay');
-  const playBtn = document.getElementById('play');
-  const padL = document.getElementById('padL');
-  const padR = document.getElementById('padR');
+  const restartBtn = document.getElementById('restart');
 
-  // High score
-  let best = +localStorage.getItem('sd_best') || 0;
-  bestEl.textContent = best;
+  // --- Simple constants ---
+  const W = cv.width, H = cv.height;
+  const GROUND_Y = H - 64;
+  const GRAV = 0.55;
+  const JUMP_VY = -10.5;      // base jump
+  const HOLD_BOOST = -0.25;   // hold to jump a tad higher (short hop vs long)
+  const MAX_FALL = 12.5;
+  const SPEED_START = 3.2;
+  const SPEED_MAX = 7.2;
 
-  // Resize to devicePixelRatio but keep logical coords
-  function fit() {
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const r = cv.getBoundingClientRect();
-    cv.width = Math.round(r.width * dpr);
-    cv.height = Math.round(r.height * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-  new ResizeObserver(fit).observe(cv);
-  fit();
-
-  // ===== Game state =====
-  const state = {
-    running:false, over:false,
-    px: cv.width/(window.devicePixelRatio||1)/2, // player x
-    py: (cv.height/(window.devicePixelRatio||1)) - 60, // player y
-    pw: 46, ph: 20, vx: 0,
-    moveLeft:false, moveRight:false,
-    speed: 3, // world scroll
-    score:0,
-    items:[], // hazards & stars
-    t:0
+  // player sprite (square dude with hat, mario-ish)
+  const player = {
+    x: 120, y: GROUND_Y - 28, w: 22, h: 28, vy: 0, onGround: true,
+    jumpHeld: false, jumpBuffer: 0, coyote: 0
   };
 
-  // Input (keyboard)
+  // world state
+  const state = {
+    running: false, over: false, t: 0, speed: SPEED_START, score: 0,
+    obstacles: [], // pipes and goombas, coins
+    clouds: []
+  };
+
+  // best score
+  let best = +localStorage.getItem('mario_like_best') || 0;
+  bestEl.textContent = best;
+
+  // --- Input: one-button jump ---
+  let wantJump = false;
+  function press(){ wantJump = true; player.jumpHeld = true; }
+  function release(){ player.jumpHeld = false; }
+
+  // keyboard
   addEventListener('keydown', e=>{
-    if(e.key==='ArrowLeft' || e.key==='a' || e.key==='A') state.moveLeft = true;
-    if(e.key==='ArrowRight'|| e.key==='d' || e.key==='D') state.moveRight = true;
-    if(e.key===' ' && !state.running) start(); // space to quick start
+    if(e.repeat) return;
+    if(e.code==='Space' || e.code==='ArrowUp' || e.code==='KeyW'){ press(); }
+    if(e.code==='Enter' && !state.running) start();
   });
   addEventListener('keyup', e=>{
-    if(e.key==='ArrowLeft' || e.key==='a' || e.key==='A') state.moveLeft = false;
-    if(e.key==='ArrowRight'|| e.key==='d' || e.key==='D') state.moveRight = false;
+    if(e.code==='Space' || e.code==='ArrowUp' || e.code==='KeyW'){ release(); }
   });
+  // pointer/touch anywhere on canvas
+  cv.addEventListener('pointerdown', press, {passive:true});
+  addEventListener('pointerup', release, {passive:true});
 
-  // Input (touch pads)
-  function bindPad(el, dir){
-    const on = ()=>{ state[dir] = true; };
-    const off= ()=>{ state[dir] = false; };
-    el.addEventListener('pointerdown', on, {passive:true});
-    el.addEventListener('pointerup', off, {passive:true});
-    el.addEventListener('pointerleave', off, {passive:true});
-    el.addEventListener('touchstart', on, {passive:true});
-    el.addEventListener('touchend', off, {passive:true});
+  restartBtn.onclick = () => { start(); };
+
+  // --- Helpers ---
+  const rand = (a,b)=>Math.random()*(b-a)+a;
+  const irand = (a,b)=>Math.floor(rand(a,b));
+  function aabb(a,b){ return a.x<a.bx && a.ax<b.x && a.y<a.by && a.ay<b.y; } // not used
+  function overlap(ax,ay,aw,ah, bx,by,bw,bh){
+    return ax < bx+bw && ax+aw > bx && ay < by+bh && ay+ah > by;
   }
-  bindPad(padL, 'moveLeft');
-  bindPad(padR, 'moveRight');
 
-  // Start/Restart
-  startBtn.onclick = start;
-  playBtn.onclick  = start;
+  function reset(){
+    state.running = true; state.over = false; state.t = 0; state.speed = SPEED_START; state.score = 0;
+    state.obstacles.length = 0; state.clouds.length = 0;
+    player.x = 120; player.y = GROUND_Y - player.h; player.vy = 0; player.onGround = true; player.coyote = 0; player.jumpBuffer = 0; wantJump=false; player.jumpHeld=false;
 
-  function start(){
-    const W = cv.width/(window.devicePixelRatio||1);
-    const H = cv.height/(window.devicePixelRatio||1);
-    state.running = true; state.over=false;
-    state.px = W/2; state.py = H - 60; state.vx = 0;
-    state.speed = 3; state.score = 0; state.items.length = 0; state.t=0;
-    overlay.style.display='none';
+    // a few clouds
+    for(let i=0;i<5;i++){
+      state.clouds.push({x: irand(0,W), y: irand(20,120), s: rand(0.4, 1.2)});
+    }
+    // prime some obstacles
+    let x = 480;
+    for(let i=0;i<4;i++){
+      spawnChunk(x); x += irand(220, 320);
+    }
+    scoreEl.textContent = '0';
   }
+
+  function start(){ reset(); }
 
   function gameOver(){
-    state.running=false; state.over=true;
-    if(state.score > best){ best = state.score; localStorage.setItem('sd_best', best); bestEl.textContent = best; }
-    overlay.style.display='flex';
-    overlay.querySelector('h1').textContent = 'Game Over';
-    overlay.querySelector('.muted').innerHTML = `Score: <b>${state.score}</b> • Best: <b>${best}</b>`;
+    state.running = false; state.over = true;
+    if(state.score > best){ best = state.score; localStorage.setItem('mario_like_best', best); bestEl.textContent = best; }
+    draw(true);
   }
 
-  // ===== Entities =====
-  // item: {x,y,w,h,type:'hazard'|'star'}
-  function spawnRow(){
-    const W = cv.width/(window.devicePixelRatio||1);
-    // 3 lanes
-    const lanes = [W*0.2, W*0.5, W*0.8];
-    // always at least one thing
-    const count = 2; // fixed for balance
-    for(let i=0;i<count;i++){
-      const lane = lanes.splice(Math.floor(Math.random()*lanes.length),1)[0];
-      const type = Math.random()<0.33 ? 'star' : 'hazard';
-      if(type==='hazard'){
-        state.items.push({x: lane-28, y:-30, w:56, h:22, type});
-      }else{
-        state.items.push({x: lane-14, y:-30, w:28, h:28, type});
+  // --- Spawning ---
+  function spawnPipe(x){
+    const h = irand(34, 60);
+    state.obstacles.push({type:'pipe', x, y: GROUND_Y - h, w: 36, h});
+  }
+  function spawnGoomba(x){
+    state.obstacles.push({type:'goomba', x, y: GROUND_Y - 20, w: 20, h: 20, vy:0, squished:false});
+  }
+  function spawnCoin(x, y){
+    state.obstacles.push({type:'coin', x, y, w: 14, h: 14, taken:false});
+  }
+
+  // mix: sometimes pipe, sometimes goomba + coin arc
+  function spawnChunk(xStart){
+    const r = Math.random();
+    if(r < 0.45){
+      // single pipe with a coin above
+      spawnPipe(xStart);
+      spawnCoin(xStart + 10, GROUND_Y - irand(90, 130));
+    }else if(r < 0.85){
+      // two small pipes
+      spawnPipe(xStart);
+      spawnPipe(xStart + irand(90, 130));
+      if(Math.random()<0.5) spawnCoin(xStart + 50, GROUND_Y - irand(110, 140));
+    }else{
+      // goomba and coin line
+      spawnGoomba(xStart);
+      for(let i=0;i<3;i++){
+        spawnCoin(xStart + i*24, GROUND_Y - 110 - Math.sin(i)*10);
       }
     }
   }
 
-  // ===== Update & Render =====
+  // --- Update ---
   function update(){
-    const W = cv.width/(window.devicePixelRatio||1);
-    const H = cv.height/(window.devicePixelRatio||1);
-    if(!state.running){ render(); return; }
+    if(!state.running){ draw(false); requestAnimationFrame(update); return; }
     state.t++;
 
-    // Move player
-    const accel = 0.9;
-    if(state.moveLeft)  state.vx -= accel;
-    if(state.moveRight) state.vx += accel;
-    // friction & clamp
-    state.vx *= 0.90;
-    state.vx = Math.max(-6, Math.min(6, state.vx));
-    state.px += state.vx;
-    state.px = Math.max(24, Math.min(W-24, state.px));
-
-    // Spawn rows
-    if(state.t % 42 === 0) spawnRow();
-
-    // Move items (downwards)
-    for(const it of state.items){
-      it.y += state.speed*1.6;
+    // clouds move slow
+    for(const c of state.clouds){
+      c.x -= state.speed * 0.25 * c.s;
+      if(c.x < -60){ c.x = W + 40; c.y = irand(20,120); c.s = rand(0.4,1.2); }
     }
 
-    // Collisions & cleanup
-    for(let i=state.items.length-1;i>=0;i--){
-      const it = state.items[i];
-      if(it.y > H+40){ state.items.splice(i,1); continue; }
+    // jump buffering & coyote time for nice feel
+    if(wantJump){ player.jumpBuffer = 8; wantJump=false; }
+    if(player.onGround) player.coyote = 6; else if(player.coyote>0) player.coyote--;
 
-      // AABB collision
-      const px=state.px - state.pw/2, py=state.py - state.ph/2, pw=state.pw, ph=state.ph;
-      if(it.type==='hazard'){
-        if(rectsOverlap(px,py,pw,ph, it.x,it.y,it.w,it.h)) { gameOver(); return; }
-      }else{ // star
-        if(rectsOverlap(px,py,pw,ph, it.x,it.y,it.w,it.h)){
-          state.score += 10;
-          scoreEl.textContent = state.score;
-          state.items.splice(i,1);
+    // handle jump
+    if(player.jumpBuffer>0){
+      if(player.onGround || player.coyote>0){
+        player.vy = JUMP_VY;
+        player.onGround = false;
+        player.jumpBuffer = 0;
+      }else{
+        player.jumpBuffer--;
+      }
+    }
+    // variable jump height: holding jump reduces gravity briefly
+    if(player.jumpHeld && player.vy < 0){ player.vy += HOLD_BOOST; }
+
+    // apply gravity
+    player.vy += GRAV;
+    if(player.vy > MAX_FALL) player.vy = MAX_FALL;
+    player.y += player.vy;
+
+    // ground collision
+    if(player.y + player.h >= GROUND_Y){
+      player.y = GROUND_Y - player.h;
+      player.vy = 0; player.onGround = true;
+    } else {
+      player.onGround = false;
+    }
+
+    // move obstacles
+    for(const o of state.obstacles){
+      o.x -= state.speed;
+      // simple goomba hop
+      if(o.type==='goomba' && !o.squished){
+        if(o.vy === 0 && Math.random()<0.004){ o.vy = -6; }
+        o.vy += GRAV; if(o.vy>MAX_FALL) o.vy = MAX_FALL;
+        o.y += o.vy;
+        if(o.y + o.h >= GROUND_Y){ o.y = GROUND_Y - o.h; o.vy = 0; }
+      }
+    }
+
+    // cull off-screen & spawn ahead
+    while(state.obstacles.length && state.obstacles[0].x < -80) state.obstacles.shift();
+    const lastX = state.obstacles.length ? state.obstacles[state.obstacles.length-1].x : 400;
+    if(lastX < W + 60) spawnChunk(W + irand(140, 260));
+
+    // collisions
+    const px = player.x, py = player.y, pw = player.w, ph = player.h;
+    for(let i=state.obstacles.length-1; i>=0; i--){
+      const o = state.obstacles[i];
+      if(o.type==='coin'){
+        if(!o.taken && overlap(px,py,pw,ph, o.x,o.y,o.w,o.h)){
+          o.taken = true; state.score += 5; scoreEl.textContent = state.score;
+          state.obstacles.splice(i,1);
+        }
+        continue;
+      }
+      if(o.type==='pipe'){
+        if(overlap(px,py,pw,ph, o.x,o.y,o.w,o.h)){ gameOver(); return; }
+      }else if(o.type==='goomba'){
+        if(o.squished) continue;
+        if(overlap(px,py,pw,ph, o.x,o.y,o.w,o.h)){
+          // if falling onto it -> stomp
+          if(player.vy > 0 && py + ph - o.y < 12){
+            o.squished = true; state.score += 10; scoreEl.textContent = state.score;
+            player.vy = -7.5; // bounce
+          }else{
+            gameOver(); return;
+          }
         }
       }
     }
 
-    // Difficulty scale
-    if(state.t % 300 === 0) state.speed = Math.min(6.5, state.speed + 0.4);
+    // difficulty ramp
+    if(state.t % 240 === 0) state.speed = Math.min(SPEED_MAX, state.speed + 0.25);
+    // passive score
+    if(state.t % 30 === 0){ state.score += 1; scoreEl.textContent = state.score; }
 
-    render();
+    draw(false);
+    requestAnimationFrame(update);
   }
 
-  function rectsOverlap(ax,ay,aw,ah, bx,by,bw,bh){
-    return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
-  }
+  // --- Render ---
+  function draw(showGameOver){
+    // sky gradient already set by CSS; draw background elements
+    ctx.clearRect(0,0,W,H);
 
-  function render(){
-    const W = cv.width/(window.devicePixelRatio||1);
-    const H = cv.height/(window.devicePixelRatio||1);
+    // sky color fill (for consistent look across browsers)
+    const sky = ctx.createLinearGradient(0,0,0,H);
+    sky.addColorStop(0, '#6ec9ff'); sky.addColorStop(1, '#8fd3ff');
+    ctx.fillStyle = sky; ctx.fillRect(0,0,W,H);
 
-    // background
-    ctx.fillStyle='#0b0f24'; ctx.fillRect(0,0,W,H);
+    // clouds
+    for(const c of state.clouds){
+      ctx.fillStyle='rgba(255,255,255,.9)';
+      bubble(c.x, c.y, 26*c.s); bubble(c.x+20*c.s, c.y+6*c.s, 18*c.s); bubble(c.x-18*c.s, c.y+8*c.s, 16*c.s);
+    }
 
-    // lane glow lines
-    ctx.strokeStyle='rgba(108,207,255,.22)'; ctx.lineWidth=2;
-    [W*0.2, W*0.5, W*0.8].forEach(x=>{ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); });
+    // ground
+    ctx.fillStyle = '#6ab04c';
+    ctx.fillRect(0, GROUND_Y, W, H-GROUND_Y);
+    // dirt stripes
+    ctx.fillStyle = '#3d7a2f';
+    for(let x=0;x<W;x+=32){ ctx.fillRect(x, GROUND_Y+22, 22, 6); }
 
-    // items
-    for(const it of state.items){
-      if(it.type==='hazard'){
-        // red bar
-        ctx.fillStyle='rgba(255,107,107,.9)';
-        roundRect(it.x,it.y,it.w,it.h,6); ctx.fill();
-        ctx.strokeStyle='rgba(255,255,255,.15)'; ctx.stroke();
-      }else{ // star
-        ctx.font = '22px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-        ctx.fillText('⭐', it.x+it.w/2, it.y+it.h/2);
+    // obstacles
+    for(const o of state.obstacles){
+      if(o.type==='pipe'){
+        // green pipe (Mario-ish)
+        ctx.fillStyle = '#2ecc71';
+        ctx.fillRect(o.x, o.y, o.w, o.h);
+        ctx.fillStyle = '#27ae60';
+        ctx.fillRect(o.x-6, o.y-10, o.w+12, 10); // rim
+        ctx.strokeStyle='rgba(0,0,0,.25)'; ctx.strokeRect(o.x, o.y, o.w, o.h);
+      }else if(o.type==='goomba'){
+        // lil brown enemy
+        ctx.fillStyle = o.squished ? '#8e5a2a' : '#a8682d';
+        roundRect(o.x,o.y,o.w,o.h,4); ctx.fill();
+        if(!o.squished){
+          ctx.fillStyle='#000';
+          ctx.fillRect(o.x+5,o.y+6,3,4); ctx.fillRect(o.x+12,o.y+6,3,4);
+          ctx.fillRect(o.x+4,o.y+14,12,2);
+        }
+      }else if(o.type==='coin'){
+        ctx.fillStyle='#ffd166';
+        ctx.beginPath(); ctx.arc(o.x + o.w/2, o.y + o.h/2, o.w/2, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle='#ffef9a'; ctx.stroke();
       }
     }
 
     // player
-    const px = state.px - state.pw/2, py = state.py - state.ph/2;
     // shadow
-    ctx.fillStyle='rgba(124,255,196,.10)';
-    ctx.beginPath(); ctx.ellipse(state.px, state.py+16, 28, 8, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(0,0,0,.15)';
+    ctx.beginPath(); ctx.ellipse(player.x + player.w/2, player.y + player.h + 6, 16, 6, 0, 0, Math.PI*2); ctx.fill();
     // body
-    ctx.fillStyle='#6cf';
-    roundRect(px,py,state.pw,state.ph,8); ctx.fill();
-    ctx.strokeStyle='rgba(108,207,255,.6)'; ctx.stroke();
+    ctx.fillStyle='#ff6b6b';
+    roundRect(player.x, player.y, player.w, player.h, 4); ctx.fill();
+    // hat
+    ctx.fillStyle='#e74c3c';
+    ctx.fillRect(player.x-2, player.y-6, player.w+4, 6);
+    // face dot
+    ctx.fillStyle='#000'; ctx.fillRect(player.x+14, player.y+10, 2, 2);
 
-    // subtle top glow line
-    ctx.strokeStyle='rgba(124,255,196,.12)'; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.moveTo(10, 12); ctx.lineTo(W-10, 12); ctx.stroke();
+    // UI overlay if game over
+    if(showGameOver){
+      ctx.fillStyle='rgba(0,0,0,.55)';
+      ctx.fillRect(W/2-140, H/2-60, 280, 120);
+      ctx.strokeStyle='#ffffff33'; ctx.strokeRect(W/2-140, H/2-60, 280, 120);
+      ctx.fillStyle='#fff'; ctx.font='bold 26px system-ui, sans-serif';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('GAME OVER', W/2, H/2-12);
+      ctx.font='16px system-ui, sans-serif';
+      ctx.fillText('Press Enter / Tap to restart', W/2, H/2+20);
+    }
   }
 
+  function bubble(x,y,r){ ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); }
   function roundRect(x,y,w,h,r){
     ctx.beginPath();
     ctx.moveTo(x+r,y);
@@ -268,9 +340,14 @@
     ctx.closePath();
   }
 
-  // Loop
-  let raf; function loop(){ update(); raf=requestAnimationFrame(loop); }
-  raf=requestAnimationFrame(loop);
+  // restart by clicking/tapping canvas when not running
+  cv.addEventListener('pointerdown', ()=>{ if(!state.running) start(); });
+
+  // start loop
+  requestAnimationFrame(function loop(){ update(); });
+
+  // auto-start for quick test (comment this out if you prefer to press Enter)
+  // start();
 })();
 </script>
 </body>
