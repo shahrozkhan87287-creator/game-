@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Mini GTA: Shahroz City</title>
+<style>
+  html,body{height:100%;margin:0;background:#0f1020;color:#eaf1ff;font-family:system-ui,Segoe UI,Roboto,Arial}
+  #game{display:block;margin:0 auto;background:#1a1c33;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  .hud{
+    position:fixed;left:50%;transform:translateX(-50%);top:8px;display:flex;gap:8px;flex-wrap:wrap;z-index:2
+  }
+  .pill{background:#0008;border:1px solid #ffffff22;border-radius:12px;padding:6px 10px;font-weight:800}
+  .msg{position:fixed;left:50%;transform:translateX(-50%);bottom:10px;background:#0009;border:1px solid #ffffff22;border-radius:12px;padding:8px 12px;font-weight:700;z-index:2;max-width:min(96vw,800px);text-align:center}
+  .credit{position:fixed;right:10px;bottom:10px;background:#0007;border:1px solid #ffffff22;border-radius:10px;padding:6px 10px;font-weight:800}
+  .touch{
+    position:fixed;inset:auto 0 10px 0;display:flex;justify-content:space-between;padding:0 10px;z-index:3;pointer-events:none
+  }
+  .btn{
+    pointer-events:auto;user-select:none;touch-action:none;
+    width:64px;height:64px;background:#0007;border:1px solid #ffffff22;border-radius:18px;display:grid;place-items:center;font-size:26px
+  }
+  .rightBtns{display:flex;gap:10px}
+  @media (min-width:920px){ .touch{display:none} }
+</style>
+</head>
+<body>
+<canvas id="game" width="980" height="600" aria-label="Mini GTA canvas"></canvas>
+
+<div class="hud" id="hud">
+  <div class="pill">💰 Cash: <span id="cash">0</span></div>
+  <div class="pill">⭐ Wanted: <span id="wanted">0</span></div>
+  <div class="pill">⛽ Speed: <span id="speed">0</span> km/h</div>
+  <div class="pill">🎯 Mission: <span id="mission">Find the briefcase</span></div>
+</div>
+<div class="msg" id="msg">Welcome to <b>Shahroz City</b>! WASD/Arrows to drive, Space to handbrake. Grab the 💼, then deliver it to the ⭐ star. Avoid 🚓 cops!</div>
+<div class="credit">Created by <b>Shahroz Khan</b> 🚗</div>
+
+<!-- Mobile controls -->
+<div class="touch">
+  <div class="rightBtns">
+    <div class="btn" id="left">⬅️</div>
+    <div class="btn" id="right">➡️</div>
+  </div>
+  <div class="rightBtns">
+    <div class="btn" id="up">⬆️</div>
+    <div class="btn" id="down">⬇️</div>
+    <div class="btn" id="brake">🅿️</div>
+  </div>
+</div>
+
+<script>
+/* ========= Mini GTA-like by Shahroz Khan ========= */
+const W=980,H=600;
+const cv=document.getElementById('game'), ctx=cv.getContext('2d');
+const hud={cash:$("#cash"),wanted:$("#wanted"),speed:$("#speed"),mission:$("#mission"),msg:$("#msg")};
+function $(s){return document.querySelector(s)}
+const keys={up:false,down:false,left:false,right:false,hand:false};
+const touches={up:false,down:false,left:false,right:false,hand:false};
+attachTouch("#up","up");attachTouch("#down","down");attachTouch("#left","left");attachTouch("#right","right");attachTouch("#brake","hand");
+
+function attachTouch(id,k){
+  const el=document.querySelector(id); if(!el) return;
+  const on=()=>touches[k]=true, off=()=>touches[k]=false;
+  ["pointerdown","touchstart"].forEach(e=>el.addEventListener(e, on,{passive:true}));
+  ["pointerup","pointerleave","touchend","touchcancel"].forEach(e=>el.addEventListener(e, off,{passive:true}));
+}
+
+addEventListener('keydown',e=>{
+  if(["ArrowUp","w","W"].includes(e.key)) keys.up=true;
+  if(["ArrowDown","s","S"].includes(e.key)) keys.down=true;
+  if(["ArrowLeft","a","A"].includes(e.key)) keys.left=true;
+  if(["ArrowRight","d","D"].includes(e.key)) keys.right=true;
+  if(e.code==="Space") keys.hand=true;
+});
+addEventListener('keyup',e=>{
+  if(["ArrowUp","w","W"].includes(e.key)) keys.up=false;
+  if(["ArrowDown","s","S"].includes(e.key)) keys.down=false;
+  if(["ArrowLeft","a","A"].includes(e.key)) keys.left=false;
+  if(["ArrowRight","d","D"].includes(e.key)) keys.right=false;
+  if(e.code==="Space") keys.hand=false;
+});
+
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function rand(a,b){return Math.random()*(b-a)+a}
+function irand(a,b){return Math.floor(rand(a,b))}
+
+const city = {
+  roads:[], buildings:[], cones:[], cash:[], cops:[], goal:{x:860,y:80,r:24},
+  briefcase:{x:140,y:520,r:16,taken:false},
+};
+
+function addRect(list,x,y,w,h){ list.push({x,y,w,h}) }
+function pointInRect(px,py,r){return px>r.x && py>r.y && px<r.x+r.w && py<r.y+r.h}
+
+function buildCity(){
+  // main roads (big rectangles the car can drive freely on)
+  city.roads=[];
+  addRect(city.roads,0,260,W,80);           // horizontal main
+  addRect(city.roads,200,0,80,H);           // vertical main
+  addRect(city.roads,620,120,80,420);       // vertical 2
+  addRect(city.roads,420,420,420,80);       // south avenue
+  // buildings (impassable)
+  city.buildings=[];
+  addRect(city.buildings,20,20,150,180);
+  addRect(city.buildings,320,40,220,140);
+  addRect(city.buildings,740,20,200,140);
+  addRect(city.buildings,40,380,140,180);
+  addRect(city.buildings,300,300,220,100);
+  addRect(city.buildings,720,320,220,80);
+  // cones (knockables for cash)
+  city.cones=[]; for(let i=0;i<14;i++){
+    city.cones.push({x: irand(40,W-40), y: irand(40,H-40), r:10, alive:true});
+  }
+  // cash pickups
+  city.cash=[]; for(let i=0;i<6;i++){
+    city.cash.push({x: irand(40,W-40), y: irand(40,H-40), r:8, alive:true});
+  }
+  // cops
+  city.cops=[];
+  for(let i=0;i<3;i++){
+    city.cops.push(makeCop( irand(100,900), irand(100,500) ));
+  }
+}
+function makeCop(x,y){
+  return {x,y, angle:rand(0,Math.PI*2), v:0, vmax:2.1, turn:0, sight:180, cool:0}
+}
+
+const car = {
+  x:120, y:300, angle:0, v:0, vmax:4.2, accel:0.16, turnRate:0.05, friction:0.02, radius:14,
+  hasCase:false
+};
+
+let cash=0, wanted=0, mission=0; // 0: take case, 1: reach star
+function resetGame(){
+  buildCity();
+  car.x=120; car.y=300; car.angle=0; car.v=0; car.hasCase=false;
+  cash=0; wanted=0; mission=0; city.briefcase.taken=false;
+  info("Mission: Grab the 💼 in the south-west, then deliver to the ⭐ in north-east. Avoid cops!");
+}
+resetGame();
+
+function onRoad(x,y){
+  for(const r of city.roads){ if(pointInRect(x,y,r)) return true }
+  return false;
+}
+function hitsBuilding(nx,ny){
+  for(const b of city.buildings){ if(pointInRect(nx,ny,b)) return true }
+  return false;
+}
+
+function update(dt){
+  const k = {
+    up: keys.up || touches.up,
+    down: keys.down || touches.down,
+    left: keys.left || touches.left,
+    right: keys.right || touches.right,
+    hand: keys.hand || touches.hand
+  };
+
+  // acceleration / braking
+  if(k.up) car.v += car.accel;
+  if(k.down) car.v -= car.accel*0.9;
+  if(k.hand) car.v *= 0.92; // handbrake drift
+  // friction
+  car.v *= (1 - car.friction);
+  car.v = clamp(car.v, -car.vmax*0.6, car.vmax);
+
+  // steering (less control at low speed)
+  const steer = (k.left?-1:0) + (k.right?1:0);
+  car.angle += steer * car.turnRate * (0.6 + Math.abs(car.v));
+
+  // propose movement
+  const nx = car.x + Math.cos(car.angle)*car.v;
+  const ny = car.y + Math.sin(car.angle)*car.v;
+
+  // keep in bounds
+  let blocked = false;
+  if(nx<10||nx>W-10||ny<10||ny>H-10) blocked = true;
+  if(hitsBuilding(nx,ny)) blocked = true;
+
+  // off-road slows + increases wanted slightly
+  if(!onRoad(nx,ny)) { car.v*=0.96; wanted = clamp(wanted+0.002,0,5); }
+
+  if(!blocked){ car.x=nx; car.y=ny; } else { car.v *= -0.3; wanted = clamp(wanted+0.05,0,5); }
+
+  // cones
+  for(const c of city.cones){
+    if(!c.alive) continue;
+    const d = Math.hypot(car.x - c.x, car.y - c.y);
+    if(d < car.radius + c.r){
+      c.alive = false;
+      cash += 5;
+      wanted = clamp(wanted+0.3,0,5);
+      puff(c.x,c.y,"🟧");
+    }
+  }
+
+  // cash pickups
+  for(const m of city.cash){
+    if(!m.alive) continue;
+    const d = Math.hypot(car.x - m.x, car.y - m.y);
+    if(d < car.radius + m.r){
+      m.alive = false;
+      cash += 20;
+      puff(m.x,m.y,"💵");
+    }
+  }
+
+  // briefcase
+  if(!city.briefcase.taken){
+    const d = Math.hypot(car.x - city.briefcase.x, car.y - city.briefcase.y);
+    if(d < car.radius + city.briefcase.r + 6){
+      city.briefcase.taken = true; car.hasCase = true; mission=1;
+      info("Nice! Now deliver the 💼 to the ⭐. Cops noticed…");
+      wanted = clamp(wanted+1.2,0,5);
+    }
+  }
+
+  // goal
+  if(car.hasCase){
+    const d = Math.hypot(car.x - city.goal.x, car.y - city.goal.y);
+    if(d < car.radius + city.goal.r + 6){
+      car.hasCase=false; mission=2; cash+=100;
+      info("Mission complete! 💯 — You delivered the goods. Press R to play again.");
+    }
+  }
+
+  // cops AI
+  for(const cop of city.cops){
+    const dx = car.x - cop.x, dy = car.y - cop.y;
+    const dist = Math.hypot(dx,dy);
+    const dir = Math.atan2(dy,dx);
+    const see = dist < (120 + wanted*80);
+    if(see){ // chase
+      const da = angleDiff(cop.angle, dir);
+      cop.angle += clamp(da,-0.05,0.05);
+      cop.v = clamp(cop.v + 0.05, 0, cop.vmax + wanted*0.2);
+    } else { // patrol
+      cop.v = clamp(cop.v - 0.05, 0, cop.vmax);
+      cop.angle += (Math.random()-0.5)*0.02;
+    }
+    // move
+    cop.x += Math.cos(cop.angle)*cop.v;
+    cop.y += Math.sin(cop.angle)*cop.v;
+    // avoid buildings & bounds
+    if(hitsBuilding(cop.x, cop.y) || cop.x<10||cop.x>W-10||cop.y<10||cop.y>H-10){
+      cop.angle += Math.PI*0.5;
+      cop.x = clamp(cop.x,12,W-12); cop.y = clamp(cop.y,12,H-12);
+    }
+    // collision with car -> bust
+    if(dist < 18){
+      if(mission!==2){
+        info("🚓 Busted! Cops caught you. Press R to retry.");
+        mission = -1;
+        car.v=0; car.x=car.x; // freeze-ish
+      }
+    }
+  }
+
+  // HUD
+  hud.cash.textContent = cash;
+  hud.wanted.textContent = "★".repeat(Math.round(wanted));
+  hud.speed.textContent = Math.round(Math.abs(car.v)*28);
+  hud.mission.textContent = mission===0?"Find the briefcase":"Deliver to the ⭐";
+}
+function angleDiff(a,b){ let d=b-a; while(d>Math.PI) d-=2*Math.PI; while(d<-Math.PI) d+=2*Math.PI; return d }
+
+const puffs=[];
+function puff(x,y,t="💨"){ puffs.push({x,y,t,a:1}) }
+
+function render(){
+  // backdrop
+  ctx.fillStyle="#111424"; ctx.fillRect(0,0,W,H);
+
+  // roads
+  for(const r of city.roads){ ctx.fillStyle="#343854"; ctx.fillRect(r.x,r.y,r.w,r.h) }
+  // lane stripes
+  ctx.strokeStyle="#cfd3ff22"; ctx.lineWidth=2;
+  for(const r of city.roads){
+    ctx.setLineDash([10,10]); ctx.beginPath();
+    if(r.w>r.h){ ctx.moveTo(r.x+4, r.y+r.h/2); ctx.lineTo(r.x+r.w-4, r.y+r.h/2); }
+    else { ctx.moveTo(r.x+r.w/2, r.y+4); ctx.lineTo(r.x+r.w/2, r.y+r.h-4); }
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // buildings
+  for(const b of city.buildings){
+    ctx.fillStyle="#22263f"; ctx.fillRect(b.x,b.y,b.w,b.h);
+    ctx.strokeStyle="#ffffff18"; ctx.strokeRect(b.x,b.y,b.w,b.h);
+  }
+
+  // cones
+  for(const c of city.cones){
+    if(!c.alive) continue;
+    drawEmoji(c.x,c.y,"🟧",24);
+  }
+  // cash
+  for(const m of city.cash){
+    if(!m.alive) continue;
+    drawEmoji(m.x,m.y,"💵",20);
+  }
+
+  // briefcase & goal
+  if(!city.briefcase.taken) drawEmoji(city.briefcase.x, city.briefcase.y,"💼",24);
+  drawEmoji(city.goal.x, city.goal.y, "⭐",26);
+
+  // cops
+  for(const cop of city.cops){ drawCar(cop.x,cop.y,cop.angle,"#1ad1ff","#052c3a") }
+
+  // player car
+  drawCar(car.x,car.y,car.angle,"#ff6b6b","#4b0a0a");
+  if(car.hasCase) drawEmoji(car.x,car.y-24,"📦",20);
+
+  // particles
+  for(const p of puffs){
+    ctx.globalAlpha=p.a; drawEmoji(p.x,p.y,p.t,22); ctx.globalAlpha=1; p.a-=0.03;
+  }
+  for(let i=puffs.length-1;i>=0;i--) if(puffs[i].a<=0) puffs.splice(i,1);
+}
+
+function drawCar(x,y,a,body="#ff6b6b",shadow="#4b0a0a"){
+  ctx.save(); ctx.translate(x,y); ctx.rotate(a);
+  // shadow
+  ctx.fillStyle=shadow; roundRect(-16,-9,32,18,5); ctx.fill();
+  // body
+  ctx.fillStyle=body; roundRect(-14,-7,28,14,4); ctx.fill();
+  // windshield
+  ctx.fillStyle="#cfe9ff"; roundRect(-6,-6,12,7,2); ctx.fill();
+  ctx.restore();
+}
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath() }
+function drawEmoji(x,y,t,size=24){ ctx.font=size+"px serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(t,x,y) }
+
+let lt=0;
+function loop(t){
+  const dt = (t-lt)/16.67; lt=t;
+  if(mission!==-1) update(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+function info(text){
+  hud.msg.textContent = text;
+  hud.msg.style.opacity=1;
+  clearTimeout(info._t);
+  info._t=setTimeout(()=>hud.msg.style.opacity=0.92, 3500);
+}
+
+// restart
+addEventListener('keydown',e=>{ if(e.key==='r'||e.key==='R'){ resetGame(); info("Restarted!"); } });
+
+</script>
+</body>
+</html>
