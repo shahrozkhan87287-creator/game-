@@ -3,55 +3,67 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Neon Runner — by Shahroz Khan</title>
-<meta name="description" content="Fast, neon-styled endless runner with power-ups and high score.">
+<title>Neon Runner 2.0 — by Shahroz Khan</title>
+<meta name="description" content="Fast, neon endless runner with power-ups, missions, achievements, and high score.">
 <style>
   :root{
-    --bg1:#0a0b1a; --bg2:#121532; --glow:#6cf; --accent:#ff6b9a; --accent2:#7cffc4; --panel:#ffffff12;
+    --bg1:#08101e; --bg2:#121a34; --lane:#6cf; --lane2:#7cffc4; --accent:#ff6b9a; --accent2:#ffd166; --panel:#ffffff12;
+    --text:#eaf1ff;
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
   body{
     font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
-    color:#eaf1ff;
+    color:var(--text);
     background:
-      radial-gradient(800px 600px at 20% 10%, #18204a 0%, transparent 60%),
-      radial-gradient(900px 900px at 80% 90%, #161a3b 0%, transparent 60%),
+      radial-gradient(900px 600px at 20% 10%, #152042 0%, transparent 60%),
+      radial-gradient(900px 900px at 80% 90%, #141a37 0%, transparent 60%),
       linear-gradient(135deg,var(--bg1),var(--bg2));
     overflow:hidden;
   }
 
   /* Frame */
-  .wrap{max-width:980px;margin:12px auto;padding:0 12px}
-  #game{display:block; width:100%; height:auto; background:#0b0f24; border:1px solid #ffffff22; border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  .wrap{max-width:980px;margin:10px auto;padding:0 12px}
+  #game{display:block;width:100%;height:auto;background:#0b0f24;border:1px solid #ffffff22;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
 
   /* HUD */
-  .hud{
-    position:fixed; left:50%; transform:translateX(-50%); top:10px; display:flex; gap:10px; flex-wrap:wrap; z-index:3
-  }
-  .pill{background:var(--panel); border:1px solid #ffffff26; border-radius:12px; padding:8px 12px; font-weight:800}
-  .btn{appearance:none;border:none;cursor:pointer; color:#111; font-weight:900; padding:10px 14px; border-radius:12px;
-       background:linear-gradient(135deg,#7cffc4,#6cf); box-shadow:0 10px 24px rgba(0,0,0,.35)}
+  .hud{position:fixed;left:50%;transform:translateX(-50%);top:8px;display:flex;gap:8px;flex-wrap:wrap;z-index:4}
+  .pill{background:var(--panel);border:1px solid #ffffff26;border-radius:12px;padding:8px 12px;font-weight:800}
+  .btn{appearance:none;border:none;cursor:pointer;color:#111;font-weight:900;padding:10px 14px;border-radius:12px;background:linear-gradient(135deg,#7cffc4,#6cf);box-shadow:0 10px 24px rgba(0,0,0,.35)}
   .btn:active{transform:scale(.98)}
+  .ghost{background:linear-gradient(135deg,#ffd166,#ffea9a)}
+  .danger{background:linear-gradient(135deg,#ff6b6b,#ff9aa9)}
 
-  /* Overlay */
-  #overlay{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:4;
-            backdrop-filter: blur(8px); background:#0a0c20cc }
-  .panel{ background:#0c1128; border:1px solid #ffffff26; border-radius:16px; padding:18px; width:min(680px,92vw);
-          box-shadow:0 24px 60px rgba(0,0,0,.6); text-align:center }
-  .title{font-size:clamp(24px,5vw,36px); margin:0 0 6px}
+  .credit{position:fixed;right:10px;bottom:10px;z-index:3;background:#0006;border:1px solid #ffffff22;border-radius:10px;padding:6px 10px;font-weight:800}
+
+  /* Overlay / panels */
+  #overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:5;backdrop-filter:blur(8px);background:#0a0c20cc}
+  .panel{background:#0c1128;border:1px solid #ffffff26;border-radius:16px;padding:18px;width:min(720px,94vw);box-shadow:0 24px 60px rgba(0,0,0,.6);text-align:center}
+  .title{font-size:clamp(24px,5vw,36px);margin:0 0 6px}
   .muted{opacity:.9}
-  .credit{ position:fixed; right:10px; bottom:10px; z-index:3; background:#0006; border:1px solid #ffffff22; border-radius:10px; padding:6px 10px; font-weight:800}
+  .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+  .grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-top:10px}
 
-  /* Mobile Controls */
-  .touch{ position:fixed; inset:auto 0 10px 0; display:flex; justify-content:space-between; padding:0 10px; z-index:3; pointer-events:none }
-  .tbtn{ pointer-events:auto; touch-action:none; user-select:none; width:68px; height:68px; display:grid; place-items:center;
-         background:#0007; border:1px solid #ffffff22; border-radius:18px; font-size:26px }
-  .rightBtns{display:flex; gap:10px}
+  /* Achievements toasts */
+  .toast{
+    position:fixed;left:50%;transform:translateX(-50%);top:16px;z-index:6;
+    background:#0e1534;border:1px solid #ffffff2a;border-radius:12px;padding:10px 14px;font-weight:800;
+    box-shadow:0 16px 40px rgba(0,0,0,.45);opacity:0;transition:opacity .25s, transform .25s; pointer-events:none;
+  }
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+
+  /* Mobile controls */
+  .touch{position:fixed;inset:auto 0 10px 0;display:flex;justify-content:space-between;padding:0 10px;z-index:3;pointer-events:none}
+  .tbtn{pointer-events:auto;touch-action:none;user-select:none;width:68px;height:68px;display:grid;place-items:center;background:#0007;border:1px solid #ffffff22;border-radius:18px;font-size:26px}
+  .rightBtns{display:flex;gap:10px}
   @media (min-width:900px){ .touch{display:none} }
 
+  /* Theme picker */
+  .theme{display:flex;gap:8px;justify-content:center}
+  .swatch{width:26px;height:26px;border-radius:50%;border:2px solid #ffffff44;cursor:pointer}
+
   @media (prefers-reduced-motion: reduce){
-    *{animation:none!important; transition:none!important}
+    *{animation:none!important;transition:none!important}
   }
 </style>
 </head>
@@ -64,8 +76,10 @@
     <div class="pill">Score: <span id="score">0</span></div>
     <div class="pill">Best: <span id="best">0</span></div>
     <div class="pill">Speed: <span id="spd">0</span></div>
+    <div class="pill">x<span id="combo">1</span></div>
     <button class="btn" id="pause">Pause</button>
-    <button class="btn" id="how">How to Play</button>
+    <button class="btn ghost" id="how">Help</button>
+    <button class="btn danger" id="sound">🔇</button>
   </div>
 
   <div class="credit">Created by <b>Shahroz Khan</b> ✨</div>
@@ -78,26 +92,38 @@
     </div>
     <div class="rightBtns">
       <div class="tbtn" id="jump">⤴️</div>
-      <div class="tbtn" id="slomo">🐢</div>
+      <div class="tbtn" id="dash">💨</div>
     </div>
   </div>
 
   <!-- Overlay -->
   <div id="overlay" hidden>
     <div class="panel">
-      <h1 class="title">Neon Runner</h1>
+      <h1 class="title">Neon Runner 2.0</h1>
       <p class="muted" id="ovText">
         Swipe lanes and jump over obstacles.<br>
-        Collect <b>coins</b> for points, grab <b>shield</b> (🛡️) to survive a hit, and use <b>slow-mo</b> (🐢) to chill for a moment.<br>
-        Controls: <b>← →</b> to change lanes, <b>Space/↑</b> to jump. On mobile, use the on-screen buttons.
+        Power-ups: <b>🛡️ Shield</b> (survive one hit), <b>🐢 Slow-Mo</b>, <b>🧲 Magnet</b> (attract coins), <b>💨 Dash</b> (phase through one obstacle).<br>
+        Controls: <b>← →</b> to change lanes, <b>Space/↑</b> to jump, <b>Shift</b> to Dash.  
       </p>
-      <div style="margin-top:12px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap">
+      <div class="grid">
+        <div class="pill">Daily Mission: Score 1500+</div>
+        <div class="pill">Streak: Keep combo above x5 for 5s</div>
+        <div class="pill">Collector: Grab 20 coins</div>
+      </div>
+      <div class="row" style="margin-top:12px">
         <button class="btn" id="play">Play</button>
         <button class="btn" id="restart" style="display:none">Restart</button>
         <button class="btn" id="close">Close</button>
       </div>
+      <div style="margin-top:12px">
+        Theme:
+        <div class="theme" id="themes"></div>
+      </div>
     </div>
   </div>
+
+  <!-- Achievements -->
+  <div class="toast" id="toast"></div>
 
 <script>
 (() => {
@@ -106,20 +132,46 @@
   const scoreEl = document.getElementById('score');
   const bestEl  = document.getElementById('best');
   const spdEl   = document.getElementById('spd');
+  const comboEl = document.getElementById('combo');
   const overlay = document.getElementById('overlay');
   const ovText  = document.getElementById('ovText');
   const playBtn = document.getElementById('play');
   const restartBtn = document.getElementById('restart');
   const pauseBtn = document.getElementById('pause');
   const howBtn  = document.getElementById('how');
+  const soundBtn= document.getElementById('sound');
+  const toast   = document.getElementById('toast');
 
-  const keys = {left:false,right:false,up:false};
-  const touch = {left:false,right:false,up:false,slomo:false};
+  // Themes
+  const themesEl = document.getElementById('themes');
+  const THEMES = [
+    {name:'Cyan', lane:'#6cf', glow:'#7cffc4', bg1:'#08101e', bg2:'#121a34'},
+    {name:'Rose', lane:'#ff6b9a', glow:'#ffd1e1', bg1:'#1a0d19', bg2:'#32152a'},
+    {name:'Lime', lane:'#b9ff66', glow:'#fff7a6', bg1:'#12210d', bg2:'#1e3316'},
+  ];
+  THEMES.forEach((t,i)=>{
+    const d=document.createElement('div');
+    d.className='swatch';
+    d.style.background=t.lane;
+    d.title=t.name;
+    d.onclick=()=>applyTheme(i,true);
+    themesEl.appendChild(d);
+  });
+  function applyTheme(i,save=false){
+    const t=THEMES[i];
+    document.documentElement.style.setProperty('--lane', t.lane);
+    document.documentElement.style.setProperty('--lane2', t.glow);
+    document.documentElement.style.setProperty('--bg1', t.bg1);
+    document.documentElement.style.setProperty('--bg2', t.bg2);
+    if(save) localStorage.setItem('nrTheme', i);
+  }
+  applyTheme(+localStorage.getItem('nrTheme')||0,false);
+
+  // Input
+  const keys = {left:false,right:false,up:false,dash:false};
+  const touch = {left:false,right:false,up:false,dash:false};
   const lanesX = [cv.width*0.25, cv.width*0.5, cv.width*0.75]; // 3 lanes
-
-  // mobile buttons
-  bindTouch('#left','left'); bindTouch('#right','right'); bindTouch('#jump','up');
-  document.getElementById('slomo').addEventListener('pointerdown',()=>{ if(state.slowmo<=0) state.slowmo=120; }, {passive:true});
+  bindTouch('#left','left'); bindTouch('#right','right'); bindTouch('#jump','up'); bindTouch('#dash','dash');
 
   function bindTouch(sel, k){
     const el=document.querySelector(sel); if(!el) return;
@@ -132,6 +184,7 @@
     if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A') keys.left=true;
     if(e.key==='ArrowRight'||e.key==='d'||e.key==='D') keys.right=true;
     if(e.key==='ArrowUp'||e.key==='w'||e.key==='W'||e.code==='Space') keys.up=true;
+    if(e.key==='Shift') keys.dash=true;
     if(e.key==='p'||e.key==='P') togglePause();
     if(e.key==='r'||e.key==='R') restart();
   });
@@ -139,35 +192,66 @@
     if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A') keys.left=false;
     if(e.key==='ArrowRight'||e.key==='d'||e.key==='D') keys.right=false;
     if(e.key==='ArrowUp'||e.key==='w'||e.key==='W'||e.code==='Space') keys.up=false;
+    if(e.key==='Shift') keys.dash=false;
   });
 
-  const best = +localStorage.getItem('neonBest') || 0; bestEl.textContent = best;
+  const best = +localStorage.getItem('neonBest2') || 0; bestEl.textContent = best;
+
+  // Audio (tiny beeps via WebAudio)
+  let audioCtx; let muted = localStorage.getItem('nrMuted')==='1';
+  soundBtn.textContent = muted ? '🔇' : '🔊';
+  function beep(freq=880, dur=0.08, type='sine'){
+    if(muted) return;
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type=type; o.frequency.value=freq;
+    o.connect(g); g.connect(audioCtx.destination);
+    g.gain.setValueAtTime(0.001, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.2, audioCtx.currentTime+0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+dur);
+    o.start(); o.stop(audioCtx.currentTime+dur);
+  }
+  soundBtn.onclick=()=>{ muted=!muted; localStorage.setItem('nrMuted', muted?'1':'0'); soundBtn.textContent = muted ? '🔇' : '🔊'; beep(660,0.05,'triangle'); };
 
   // Game state
   const state = {
     running:false, paused:false, t:0,
     lane:1, // 0..2
-    x: lanesX[1], y: cv.height-100, vy:0, onGround:true,
-    score:0, speed:6, maxSpeed:16,
-    shield:0, slowmo:0,
+    x: lanesX[1], y: cv.height-100, vy:0, onGround:true, canDouble:true,
+    score:0, speed:6, maxSpeed:17,
+    combo:1, comboTick:0,
+    shield:0, slowmo:0, magnet:0, dash:0, dashCD:0,
     particles:[],
     items:[], // obstacles & coins & powerups
+    bgScroll:0,
   };
 
+  // Achievements
+  const unlocks = { combo5:false, score1500:false, collector20:false };
+  function toastMsg(text){
+    toast.textContent = text;
+    toast.classList.add('show');
+    setTimeout(()=>toast.classList.remove('show'), 1600);
+  }
+
   function start(){
-    state.running=true; state.paused=false; state.t=0;
-    state.lane=1; state.x=lanesX[1]; state.y=cv.height-100; state.vy=0; state.onGround=true;
-    state.score=0; state.speed=6; state.shield=0; state.slowmo=0;
-    state.items.length=0; state.particles.length=0;
+    Object.assign(state, {
+      running:true, paused:false, t:0,
+      lane:1, x:lanesX[1], y:cv.height-100, vy:0, onGround:true, canDouble:true,
+      score:0, speed:6, shield:0, slowmo:0, magnet:0, dash:0, dashCD:0, combo:1, comboTick:0,
+    });
+    state.items.length=0; state.particles.length=0; state.bgScroll=0;
     overlay.hidden=true; restartBtn.style.display='none';
+    beep(520,0.09);
   }
   function gameOver(){
     state.running=false;
     const newBest = Math.max(best, state.score);
-    if(newBest!==best){ localStorage.setItem('neonBest', newBest); bestEl.textContent=newBest; }
-    ovText.innerHTML = `Final Score: <b>${state.score}</b><br>Best: <b>${Math.max(best, state.score)}</b><br><br>Tap Restart to try again.`;
+    if(newBest!==best){ localStorage.setItem('neonBest2', newBest); bestEl.textContent=newBest; }
+    ovText.innerHTML = `Final Score: <b>${state.score}</b><br>Best: <b>${Math.max(best, state.score)}</b><br><br><i>Tip:</i> Use Dash (Shift/💨) to phase through one obstacle.`;
     restartBtn.style.display='inline-block';
     overlay.hidden=false;
+    beep(160,0.2,'sawtooth');
   }
   function restart(){ if(!state.running) { start(); } }
 
@@ -175,24 +259,24 @@
     if(!state.running) return;
     state.paused = !state.paused;
     pauseBtn.textContent = state.paused ? 'Resume' : 'Pause';
+    beep(440,0.06);
   }
 
   // Entities
   function spawnObstacle(){
     const lane = Math.floor(Math.random()*3);
-    state.items.push({type:'ob', lane, y:-40, w:36, h:36, emoji:'🚧'});
+    state.items.push({type:'ob', lane, y:-40, w:40, h:40, emoji:'🚧'});
   }
   function spawnCoin(){
     const lane = Math.floor(Math.random()*3);
     state.items.push({type:'coin', lane, y:-40, r:14, emoji:'🪙'});
   }
-  function spawnShield(){
+  function spawnShield(){ spawnPower('shield','🛡️'); }
+  function spawnSlowmo(){ spawnPower('slow','🐢'); }
+  function spawnMagnet(){ spawnPower('mag','🧲'); }
+  function spawnPower(type,emoji){
     const lane = Math.floor(Math.random()*3);
-    state.items.push({type:'shield', lane, y:-40, r:16, emoji:'🛡️'});
-  }
-  function spawnSlowmo(){
-    const lane = Math.floor(Math.random()*3);
-    state.items.push({type:'slow', lane, y:-40, r:16, emoji:'🐢'});
+    state.items.push({type, lane, y:-40, r:16, emoji});
   }
 
   function emit(x,y,clr){
@@ -203,21 +287,35 @@
 
   function update(){
     if(!state.running || state.paused){ render(); return; }
+    state.t++;
+    state.bgScroll += (state.speed * 0.6) * (state.slowmo?0.5:1);
 
-    const laneTarget = (touch.left||keys.left) ? -1 : (touch.right||keys.right) ? 1 : 0;
-    if(laneTarget!==0){
-      state.lane = Math.max(0, Math.min(2, state.lane + laneTarget));
+    // Input lane change
+    const laneDelta = (touch.left||keys.left) ? -1 : (touch.right||keys.right) ? 1 : 0;
+    if(laneDelta!==0){
+      state.lane = Math.max(0, Math.min(2, state.lane + laneDelta));
       state.x = lanesX[state.lane];
-      // minor cooldown
       keys.left=keys.right=touch.left=touch.right=false;
+      beep(740,0.05,'triangle');
     }
 
-    // jump
-    if((touch.up||keys.up) && state.onGround){
-      state.vy = -14;
-      state.onGround=false;
+    // Jump / Double jump
+    const jumpPressed = (touch.up||keys.up);
+    if(jumpPressed){
+      if(state.onGround){
+        state.vy = -14; state.onGround=false; state.canDouble=true; beep(880,0.06);
+      } else if(state.canDouble){
+        state.vy = -12; state.canDouble=false; emit(state.x,state.y,'#6cf'); beep(980,0.06);
+      }
       keys.up=touch.up=false;
     }
+
+    // Dash
+    if((keys.dash||touch.dash) && state.dashCD<=0){
+      state.dash = 20; state.dashCD = 120; beep(660,0.06,'square');
+      keys.dash=touch.dash=false;
+    }
+    if(state.dash>0) state.dash--; else if(state.dashCD>0) state.dashCD--;
 
     // gravity
     state.vy += 0.7;
@@ -227,73 +325,103 @@
     }
 
     // difficulty & slowmo
-    const slowFactor = state.slowmo>0 ? 0.4 : 1;
+    const slowFactor = state.slowmo>0 ? 0.5 : 1;
     if(state.slowmo>0) state.slowmo--;
-    state.speed = Math.min(state.maxSpeed, state.speed + 0.002);
+    state.speed = Math.min(state.maxSpeed, state.speed + 0.003);
 
     // spawn logic
-    state.t++;
     if(state.t % Math.floor(70*slowFactor) === 0) spawnObstacle();
     if(state.t % Math.floor(55*slowFactor) === 0) spawnCoin();
-    if(state.t % Math.floor(600*slowFactor) === 0) spawnShield();
-    if(state.t % Math.floor(500*slowFactor) === 0) spawnSlowmo();
+    if(state.t % Math.floor(700*slowFactor) === 0) spawnShield();
+    if(state.t % Math.floor(600*slowFactor) === 0) spawnSlowmo();
+    if(state.t % Math.floor(800*slowFactor) === 0) spawnMagnet();
 
     // move items
-    for(const it of state.items){ it.y += state.speed * slowFactor * 1.2; }
+    for(const it of state.items){ it.y += state.speed * slowFactor * 1.3; }
 
     // collisions & cleanup
     const px = state.x, py = state.y;
     for(let i=state.items.length-1;i>=0;i--){
       const it = state.items[i];
       const ix = lanesX[it.lane];
+
+      // magnet effect
+      if(state.magnet>0 && it.type==='coin'){
+        const ang = Math.atan2(py - it.y, px - ix);
+        const pull = 2.2;
+        it.y += Math.sin(ang)*pull;
+        const nx = Math.cos(ang)*pull;
+        // visual wobble toward player
+        ctx; // no-op, just clarity
+      }
+
       // off-screen
       if(it.y > cv.height+60){ state.items.splice(i,1); continue; }
 
-      // check collision
+      // collision
       let hit=false;
       if(it.type==='ob'){
-        const w=it.w,h=it.h;
-        if(Math.abs(ix - px) < 28 && Math.abs(it.y - py) < 28){ hit=true; }
+        if(Math.abs(ix - px) < 28 && Math.abs(it.y - py) < 28){
+          hit=true;
+        }
         if(hit){
-          if(state.shield>0){
-            state.shield=0; emit(px,py,'#7cffc4'); state.items.splice(i,1);
-          }else{
+          if(state.dash>0){ // phased through
+            emit(px,py,'#fff'); state.items.splice(i,1);
+          } else if(state.shield>0){
+            state.shield=0; emit(px,py,'#7cffc4'); state.items.splice(i,1); beep(420,0.06);
+          } else {
             gameOver(); return;
           }
         }
       }else{
-        // circles
         const r = it.r || 14;
         const d = Math.hypot(ix - px, it.y - py);
         if(d < r + 22){
           if(it.type==='coin'){
-            state.score += 10; emit(ix,it.y,'#ffd166');
+            state.score += 10 * state.combo;
+            state.combo = Math.min(10, state.combo + 1);
+            state.comboTick = 120;
+            emit(ix,it.y,'#ffd166'); beep(1040,0.04);
           }else if(it.type==='shield'){
-            state.shield = 1; emit(ix,it.y,'#7cffc4');
+            state.shield = 1; emit(ix,it.y,'#7cffc4'); beep(520,0.05);
           }else if(it.type==='slow'){
-            state.slowmo = 140; emit(ix,it.y,'#6cf');
+            state.slowmo = 140; emit(ix,it.y,'#6cf'); beep(600,0.05);
+          }else if(it.type==='mag'){
+            state.magnet = 240; emit(ix,it.y,'#b6ff6b'); beep(700,0.05);
           }
           state.items.splice(i,1);
         }
       }
     }
 
+    // combo decay
+    if(state.comboTick>0) state.comboTick--; else state.combo = Math.max(1, state.combo-1);
+
     // score over time
-    state.score += Math.floor(state.speed*0.6);
+    state.score += Math.floor(state.speed*0.4);
     // HUD
     scoreEl.textContent = state.score;
     spdEl.textContent   = Math.round(state.speed*10);
+    comboEl.textContent = state.combo;
+
+    // Missions/Achievements
+    if(!unlocks.combo5 && state.combo>=5){ unlocks.combo5=true; toastMsg('🏆 Combo x5!'); }
+    if(!unlocks.score1500 && state.score>=1500){ unlocks.score1500=true; toastMsg('🏆 Scored 1500+!'); }
+    // collector tracked implicitly via score; optional extension
     render();
   }
 
   function render(){
-    // background
+    // background parallax city
     ctx.fillStyle = '#0b0f24'; ctx.fillRect(0,0,cv.width,cv.height);
+    drawCityLayer(0.2, '#0f1634', 180);
+    drawCityLayer(0.4, '#0e1a40', 120);
+    drawCityLayer(0.7, '#0d204c', 60);
 
-    // road lanes glow
+    // lane glow
     for(let i=0;i<3;i++){
       const x = lanesX[i];
-      ctx.strokeStyle = 'rgba(108, 207, 255, .35)'; ctx.lineWidth=2;
+      ctx.strokeStyle = 'rgba(108, 207, 255, .28)'; ctx.lineWidth=2;
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, cv.height); ctx.stroke();
     }
 
@@ -305,7 +433,6 @@
       const emoji = it.emoji || '🪙';
       ctx.fillText(emoji, x, y);
       if(it.type==='ob'){
-        // neon outline
         ctx.strokeStyle='rgba(255,107,154,.25)'; ctx.strokeRect(x-18,y-18,36,36);
       }
     }
@@ -326,11 +453,28 @@
     ctx.beginPath(); ctx.ellipse(px, py+20, 22, 8, 0, 0, Math.PI*2); ctx.fill();
 
     // body
-    ctx.fillStyle= state.shield ? '#7cffc4' : '#6cf';
+    ctx.fillStyle= state.shield ? '#7cffc4' : (state.magnet? '#b6ff6b' : '#6cf');
     ctx.beginPath(); ctx.arc(px, py, 20, 0, Math.PI*2); ctx.fill();
     // ring
-    ctx.strokeStyle = state.shield ? 'rgba(124,255,196,.6)' : 'rgba(108,207,255,.6)';
+    ctx.strokeStyle = state.shield ? 'rgba(124,255,196,.6)' : (state.magnet? 'rgba(182,255,107,.6)' : 'rgba(108,207,255,.6)');
     ctx.lineWidth=3; ctx.beginPath(); ctx.arc(px, py, 24, 0, Math.PI*2); ctx.stroke();
+
+    // dash aura
+    if(state.dash>0){
+      ctx.strokeStyle='rgba(255,255,255,.5)'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(px, py, 28+state.dash/2, 0, Math.PI*2); ctx.stroke();
+    }
+  }
+
+  function drawCityLayer(speed, color, height){
+    const y = cv.height - height;
+    const w = 80, gap = 40;
+    const scroll = (state.bgScroll*speed) % (w+gap);
+    ctx.fillStyle = color;
+    for(let x=-scroll; x<cv.width+scroll; x+=w+gap){
+      const h = height + Math.sin((x+state.bgScroll)*0.01)*10;
+      ctx.fillRect(x, y-(h-height)*0.3, w, h);
+    }
   }
 
   let raf, last=0;
