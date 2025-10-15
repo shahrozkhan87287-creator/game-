@@ -1,323 +1,208 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Shahroz’s Mini Mario Run</title>
-<meta name="description" content="Simple one-button runner: jump over pipes, stomp goombas, grab coins. Created by Shahroz Khan.">
 <style>
-  :root{
-    --sky:#8fd3ff; --ground:#6ab04c; --dirt:#3d7a2f; --ui:#0b0f24; --panel:#ffffff22;
-  }
-  *{box-sizing:border-box}
-  html,body{height:100%;margin:0;background:var(--ui);color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif}
-  .wrap{max-width:720px;margin:0 auto;padding:10px}
+  body{margin:0;background:#0b0f24;color:#fff;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif}
+  .wrap{max-width:740px;margin:0 auto;padding:10px}
   .hud{display:flex;justify-content:space-between;gap:8px;margin:8px 0}
-  .pill{background:#00000040;border:1px solid var(--panel);border-radius:12px;padding:8px 12px;font-weight:900}
-  #game{
-    display:block;width:100%;height:auto;background:linear-gradient(#6ec9ff,#8fd3ff);
-    border:1px solid #ffffff2a;border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.55)
-  }
+  .pill{background:#0008;border:1px solid #ffffff30;border-radius:12px;padding:8px 12px;font-weight:900}
+  #game{display:block;width:100%;height:auto;border:1px solid #ffffff22;border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.55);background:#89d6ff}
   .tip{opacity:.9;text-align:center;font-size:12px;margin-top:6px}
-  .credit{opacity:.85;text-align:center;font-size:12px;margin-top:4px}
-  .btn{appearance:none;border:none;cursor:pointer;background:#ffd166;color:#2b2110;border-radius:12px;padding:8px 12px;font-weight:900}
-  /* touch: big tap zone */
-  @media (pointer:coarse){
-    #game{touch-action:manipulation}
-  }
 </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="hud">
-      <div class="pill">Score: <span id="score">0</span></div>
-      <div class="pill">Best: <span id="best">0</span></div>
-      <button class="btn" id="restart">Restart</button>
-    </div>
-    <!-- Fixed logical size for reliability; scales visually -->
-    <canvas id="game" width="640" height="360" aria-label="Shahroz’s Mini Mario Run"></canvas>
-    <div class="tip">Tap / Click / Space / ↑ to JUMP • Jump on enemies to defeat them • Avoid pipes • Grab coins ⭐</div>
-    <div class="credit">Created by <b>Shahroz Khan</b></div>
+<div class="wrap">
+  <div class="hud">
+    <div class="pill">Score: <span id="score">0</span></div>
+    <div class="pill">Best: <span id="best">0</span></div>
+    <div class="pill">Created by <b>Shahroz Khan</b></div>
   </div>
+  <!-- Fixed logical size so physics/collisions are consistent -->
+  <canvas id="game" width="640" height="360" aria-label="Shahroz’s Mini Mario Run"></canvas>
+  <div class="tip">Jump: Space / ↑ / Tap • Avoid pipes • Grab ⭐ coins • Enter/Tap to restart</div>
+</div>
 
 <script>
 (() => {
   const cv = document.getElementById('game');
   const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
   const scoreEl = document.getElementById('score');
   const bestEl  = document.getElementById('best');
-  const restartBtn = document.getElementById('restart');
 
-  // --- Simple constants ---
-  const W = cv.width, H = cv.height;
-  const GROUND_Y = H - 64;
-  const GRAV = 0.55;
-  const JUMP_VY = -10.5;      // base jump
-  const HOLD_BOOST = -0.25;   // hold to jump a tad higher (short hop vs long)
-  const MAX_FALL = 12.5;
-  const SPEED_START = 3.2;
-  const SPEED_MAX = 7.2;
+  // Ground line
+  const GY = H - 56;
 
-  // player sprite (square dude with hat, mario-ish)
-  const player = {
-    x: 120, y: GROUND_Y - 28, w: 22, h: 28, vy: 0, onGround: true,
-    jumpHeld: false, jumpBuffer: 0, coyote: 0
-  };
+  // Player
+  const P = { x: 120, y: GY-28, w: 22, h: 28, vy: 0, on: true, hold:false, buf:0, coyote:0 };
+  const GRAV = 0.55, JUMP = -10.2, HOLD = -0.25, FALL_MAX = 12.5;
 
-  // world state
-  const state = {
-    running: false, over: false, t: 0, speed: SPEED_START, score: 0,
-    obstacles: [], // pipes and goombas, coins
-    clouds: []
-  };
+  // World
+  let running = false, over = false, t = 0, speed = 3.2, score = 0;
+  let objs = []; // {type:'pipe'|'coin', x,y,w,h,passed?,taken?}
+  let clouds = [];
+  let wantJump = false;
 
-  // best score
-  let best = +localStorage.getItem('mario_like_best') || 0;
+  // High score
+  let best = +localStorage.getItem('mmr_best') || 0;
   bestEl.textContent = best;
 
-  // --- Input: one-button jump ---
-  let wantJump = false;
-  function press(){ wantJump = true; player.jumpHeld = true; }
-  function release(){ player.jumpHeld = false; }
-
-  // keyboard
-  addEventListener('keydown', e=>{
-    if(e.repeat) return;
-    if(e.code==='Space' || e.code==='ArrowUp' || e.code==='KeyW'){ press(); }
-    if(e.code==='Enter' && !state.running) start();
-  });
-  addEventListener('keyup', e=>{
-    if(e.code==='Space' || e.code==='ArrowUp' || e.code==='KeyW'){ release(); }
-  });
-  // pointer/touch anywhere on canvas
+  // Input (one button)
+  function press(){ wantJump = true; P.hold = true; }
+  function release(){ P.hold = false; }
   cv.addEventListener('pointerdown', press, {passive:true});
   addEventListener('pointerup', release, {passive:true});
+  addEventListener('keydown', e=>{
+    if(e.repeat) return;
+    if(e.code==='Space'||e.code==='ArrowUp'||e.code==='KeyW') press();
+    if((e.code==='Enter'||e.code==='NumpadEnter') && !running) start();
+  });
+  addEventListener('keyup', e=>{
+    if(e.code==='Space'||e.code==='ArrowUp'||e.code==='KeyW') release();
+  });
+  cv.addEventListener('click', ()=>{ if(!running) start(); });
 
-  restartBtn.onclick = () => { start(); };
-
-  // --- Helpers ---
-  const rand = (a,b)=>Math.random()*(b-a)+a;
-  const irand = (a,b)=>Math.floor(rand(a,b));
-  function aabb(a,b){ return a.x<a.bx && a.ax<b.x && a.y<a.by && a.ay<b.y; } // not used
-  function overlap(ax,ay,aw,ah, bx,by,bw,bh){
-    return ax < bx+bw && ax+aw > bx && ay < by+bh && ay+ah > by;
-  }
-
-  function reset(){
-    state.running = true; state.over = false; state.t = 0; state.speed = SPEED_START; state.score = 0;
-    state.obstacles.length = 0; state.clouds.length = 0;
-    player.x = 120; player.y = GROUND_Y - player.h; player.vy = 0; player.onGround = true; player.coyote = 0; player.jumpBuffer = 0; wantJump=false; player.jumpHeld=false;
-
-    // a few clouds
-    for(let i=0;i<5;i++){
-      state.clouds.push({x: irand(0,W), y: irand(20,120), s: rand(0.4, 1.2)});
-    }
-    // prime some obstacles
-    let x = 480;
-    for(let i=0;i<4;i++){
-      spawnChunk(x); x += irand(220, 320);
-    }
+  function start(){
+    running = true; over = false; t = 0; speed = 3.2; score = 0;
+    P.x = 120; P.y = GY - P.h; P.vy = 0; P.on = true; P.hold=false; P.buf=0; P.coyote=0; wantJump=false;
+    objs.length = 0; clouds.length = 0;
+    for(let i=0;i<5;i++) clouds.push({x: rnd(0,W), y: rnd(20,120), s: rnd(0.5,1.2)});
+    let x = 420;
+    for(let i=0;i<4;i++){ spawnChunk(x); x += irnd(220,320); }
     scoreEl.textContent = '0';
   }
 
-  function start(){ reset(); }
-
   function gameOver(){
-    state.running = false; state.over = true;
-    if(state.score > best){ best = state.score; localStorage.setItem('mario_like_best', best); bestEl.textContent = best; }
+    running = false; over = true;
+    if(score > best){ best = score; localStorage.setItem('mmr_best', best); bestEl.textContent = best; }
     draw(true);
   }
 
-  // --- Spawning ---
+  function rnd(a,b){ return Math.random()*(b-a)+a; }
+  function irnd(a,b){ return Math.floor(rnd(a,b)); }
+  function hit(ax,ay,aw,ah, bx,by,bw,bh){
+    return ax < bx+bw && ax+aw > bx && ay < by+bh && ay+ah > by;
+  }
+
+  // Spawning
   function spawnPipe(x){
-    const h = irand(34, 60);
-    state.obstacles.push({type:'pipe', x, y: GROUND_Y - h, w: 36, h});
+    const h = irnd(34, 64);
+    objs.push({type:'pipe', x, y: GY - h, w: 36, h, passed:false});
   }
-  function spawnGoomba(x){
-    state.obstacles.push({type:'goomba', x, y: GROUND_Y - 20, w: 20, h: 20, vy:0, squished:false});
+  function spawnCoin(x,y){
+    objs.push({type:'coin', x, y, w:14, h:14, taken:false});
   }
-  function spawnCoin(x, y){
-    state.obstacles.push({type:'coin', x, y, w: 14, h: 14, taken:false});
-  }
-
-  // mix: sometimes pipe, sometimes goomba + coin arc
-  function spawnChunk(xStart){
+  function spawnChunk(x){
     const r = Math.random();
-    if(r < 0.45){
-      // single pipe with a coin above
-      spawnPipe(xStart);
-      spawnCoin(xStart + 10, GROUND_Y - irand(90, 130));
-    }else if(r < 0.85){
-      // two small pipes
-      spawnPipe(xStart);
-      spawnPipe(xStart + irand(90, 130));
-      if(Math.random()<0.5) spawnCoin(xStart + 50, GROUND_Y - irand(110, 140));
+    if(r < 0.6){
+      spawnPipe(x);
+      if(Math.random()<0.7) spawnCoin(x+10, GY - irnd(90,130));
     }else{
-      // goomba and coin line
-      spawnGoomba(xStart);
-      for(let i=0;i<3;i++){
-        spawnCoin(xStart + i*24, GROUND_Y - 110 - Math.sin(i)*10);
-      }
+      spawnPipe(x);
+      spawnPipe(x + irnd(90,130));
+      if(Math.random()<0.5) spawnCoin(x+50, GY - irnd(110,140));
     }
   }
 
-  // --- Update ---
   function update(){
-    if(!state.running){ draw(false); requestAnimationFrame(update); return; }
-    state.t++;
+    if(!running){ draw(false); requestAnimationFrame(update); return; }
+    t++;
 
-    // clouds move slow
-    for(const c of state.clouds){
-      c.x -= state.speed * 0.25 * c.s;
-      if(c.x < -60){ c.x = W + 40; c.y = irand(20,120); c.s = rand(0.4,1.2); }
+    // Clouds
+    for(const c of clouds){
+      c.x -= speed*0.25*c.s; if(c.x<-60){ c.x=W+40; c.y=irnd(20,120); c.s=rnd(0.5,1.2); }
     }
 
-    // jump buffering & coyote time for nice feel
-    if(wantJump){ player.jumpBuffer = 8; wantJump=false; }
-    if(player.onGround) player.coyote = 6; else if(player.coyote>0) player.coyote--;
+    // Jump buffering & coyote time
+    if(wantJump){ P.buf = 8; wantJump=false; }
+    if(P.on) P.coyote = 6; else if(P.coyote>0) P.coyote--;
 
-    // handle jump
-    if(player.jumpBuffer>0){
-      if(player.onGround || player.coyote>0){
-        player.vy = JUMP_VY;
-        player.onGround = false;
-        player.jumpBuffer = 0;
-      }else{
-        player.jumpBuffer--;
+    // Take jump if buffered
+    if(P.buf>0){
+      if(P.on || P.coyote>0){ P.vy = JUMP; P.on=false; P.buf=0; }
+      else P.buf--;
+    }
+    if(P.hold && P.vy < 0) P.vy += HOLD; // variable jump height
+
+    // Physics
+    P.vy += GRAV; if(P.vy>FALL_MAX) P.vy = FALL_MAX;
+    P.y += P.vy;
+    if(P.y + P.h >= GY){ P.y = GY - P.h; P.vy = 0; P.on = true; } else P.on = false;
+
+    // Move & manage obstacles
+    for(const o of objs){
+      o.x -= speed;
+      // score on passing pipes
+      if(o.type==='pipe' && !o.passed && o.x + o.w < P.x - P.w/2){
+        o.passed = true; score += 1; scoreEl.textContent = score;
       }
     }
-    // variable jump height: holding jump reduces gravity briefly
-    if(player.jumpHeld && player.vy < 0){ player.vy += HOLD_BOOST; }
+    while(objs.length && objs[0].x < -80) objs.shift();
+    const lastX = objs.length ? objs[objs.length-1].x : 400;
+    if(lastX < W + 60) spawnChunk(W + irnd(140, 260));
 
-    // apply gravity
-    player.vy += GRAV;
-    if(player.vy > MAX_FALL) player.vy = MAX_FALL;
-    player.y += player.vy;
-
-    // ground collision
-    if(player.y + player.h >= GROUND_Y){
-      player.y = GROUND_Y - player.h;
-      player.vy = 0; player.onGround = true;
-    } else {
-      player.onGround = false;
-    }
-
-    // move obstacles
-    for(const o of state.obstacles){
-      o.x -= state.speed;
-      // simple goomba hop
-      if(o.type==='goomba' && !o.squished){
-        if(o.vy === 0 && Math.random()<0.004){ o.vy = -6; }
-        o.vy += GRAV; if(o.vy>MAX_FALL) o.vy = MAX_FALL;
-        o.y += o.vy;
-        if(o.y + o.h >= GROUND_Y){ o.y = GROUND_Y - o.h; o.vy = 0; }
-      }
-    }
-
-    // cull off-screen & spawn ahead
-    while(state.obstacles.length && state.obstacles[0].x < -80) state.obstacles.shift();
-    const lastX = state.obstacles.length ? state.obstacles[state.obstacles.length-1].x : 400;
-    if(lastX < W + 60) spawnChunk(W + irand(140, 260));
-
-    // collisions
-    const px = player.x, py = player.y, pw = player.w, ph = player.h;
-    for(let i=state.obstacles.length-1; i>=0; i--){
-      const o = state.obstacles[i];
+    // Collisions
+    const px = P.x, py = P.y, pw = P.w, ph = P.h;
+    for(let i=objs.length-1;i>=0;i--){
+      const o = objs[i];
       if(o.type==='coin'){
-        if(!o.taken && overlap(px,py,pw,ph, o.x,o.y,o.w,o.h)){
-          o.taken = true; state.score += 5; scoreEl.textContent = state.score;
-          state.obstacles.splice(i,1);
+        if(!o.taken && hit(px,py,pw,ph, o.x,o.y,o.w,o.h)){
+          o.taken = true; score += 5; scoreEl.textContent = score; objs.splice(i,1);
         }
-        continue;
-      }
-      if(o.type==='pipe'){
-        if(overlap(px,py,pw,ph, o.x,o.y,o.w,o.h)){ gameOver(); return; }
-      }else if(o.type==='goomba'){
-        if(o.squished) continue;
-        if(overlap(px,py,pw,ph, o.x,o.y,o.w,o.h)){
-          // if falling onto it -> stomp
-          if(player.vy > 0 && py + ph - o.y < 12){
-            o.squished = true; state.score += 10; scoreEl.textContent = state.score;
-            player.vy = -7.5; // bounce
-          }else{
-            gameOver(); return;
-          }
-        }
+      }else if(o.type==='pipe'){
+        if(hit(px,py,pw,ph, o.x,o.y,o.w,o.h)){ gameOver(); return; }
       }
     }
 
-    // difficulty ramp
-    if(state.t % 240 === 0) state.speed = Math.min(SPEED_MAX, state.speed + 0.25);
-    // passive score
-    if(state.t % 30 === 0){ state.score += 1; scoreEl.textContent = state.score; }
+    // Ramp difficulty
+    if(t % 240 === 0) speed = Math.min(7.2, speed + 0.25);
 
     draw(false);
     requestAnimationFrame(update);
   }
 
-  // --- Render ---
-  function draw(showGameOver){
-    // sky gradient already set by CSS; draw background elements
-    ctx.clearRect(0,0,W,H);
-
-    // sky color fill (for consistent look across browsers)
+  function draw(showOver){
+    // Sky
     const sky = ctx.createLinearGradient(0,0,0,H);
-    sky.addColorStop(0, '#6ec9ff'); sky.addColorStop(1, '#8fd3ff');
+    sky.addColorStop(0,'#6ec9ff'); sky.addColorStop(1,'#89d6ff');
     ctx.fillStyle = sky; ctx.fillRect(0,0,W,H);
 
-    // clouds
-    for(const c of state.clouds){
-      ctx.fillStyle='rgba(255,255,255,.9)';
-      bubble(c.x, c.y, 26*c.s); bubble(c.x+20*c.s, c.y+6*c.s, 18*c.s); bubble(c.x-18*c.s, c.y+8*c.s, 16*c.s);
+    // Clouds
+    for(const c of clouds){
+      ctx.fillStyle='rgba(255,255,255,.9)'; cloud(c.x,c.y,26*c.s);
     }
 
-    // ground
-    ctx.fillStyle = '#6ab04c';
-    ctx.fillRect(0, GROUND_Y, W, H-GROUND_Y);
-    // dirt stripes
-    ctx.fillStyle = '#3d7a2f';
-    for(let x=0;x<W;x+=32){ ctx.fillRect(x, GROUND_Y+22, 22, 6); }
+    // Ground
+    ctx.fillStyle='#6ab04c'; ctx.fillRect(0,GY,W,H-GY);
+    ctx.fillStyle='#3d7a2f'; for(let x=0;x<W;x+=32) ctx.fillRect(x,GY+22,22,6);
 
-    // obstacles
-    for(const o of state.obstacles){
+    // Obstacles
+    for(const o of objs){
       if(o.type==='pipe'){
-        // green pipe (Mario-ish)
-        ctx.fillStyle = '#2ecc71';
-        ctx.fillRect(o.x, o.y, o.w, o.h);
-        ctx.fillStyle = '#27ae60';
-        ctx.fillRect(o.x-6, o.y-10, o.w+12, 10); // rim
-        ctx.strokeStyle='rgba(0,0,0,.25)'; ctx.strokeRect(o.x, o.y, o.w, o.h);
-      }else if(o.type==='goomba'){
-        // lil brown enemy
-        ctx.fillStyle = o.squished ? '#8e5a2a' : '#a8682d';
-        roundRect(o.x,o.y,o.w,o.h,4); ctx.fill();
-        if(!o.squished){
-          ctx.fillStyle='#000';
-          ctx.fillRect(o.x+5,o.y+6,3,4); ctx.fillRect(o.x+12,o.y+6,3,4);
-          ctx.fillRect(o.x+4,o.y+14,12,2);
-        }
-      }else if(o.type==='coin'){
+        ctx.fillStyle='#2ecc71'; ctx.fillRect(o.x,o.y,o.w,o.h);
+        ctx.fillStyle='#27ae60'; ctx.fillRect(o.x-6,o.y-10,o.w+12,10);
+        ctx.strokeStyle='rgba(0,0,0,.25)'; ctx.strokeRect(o.x,o.y,o.w,o.h);
+      }else{
         ctx.fillStyle='#ffd166';
-        ctx.beginPath(); ctx.arc(o.x + o.w/2, o.y + o.h/2, o.w/2, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(o.x+o.w/2,o.y+o.h/2,o.w/2,0,Math.PI*2); ctx.fill();
         ctx.strokeStyle='#ffef9a'; ctx.stroke();
       }
     }
 
-    // player
-    // shadow
+    // Player (red dude + hat)
+    // Shadow
     ctx.fillStyle='rgba(0,0,0,.15)';
-    ctx.beginPath(); ctx.ellipse(player.x + player.w/2, player.y + player.h + 6, 16, 6, 0, 0, Math.PI*2); ctx.fill();
-    // body
-    ctx.fillStyle='#ff6b6b';
-    roundRect(player.x, player.y, player.w, player.h, 4); ctx.fill();
-    // hat
-    ctx.fillStyle='#e74c3c';
-    ctx.fillRect(player.x-2, player.y-6, player.w+4, 6);
-    // face dot
-    ctx.fillStyle='#000'; ctx.fillRect(player.x+14, player.y+10, 2, 2);
+    ctx.beginPath(); ctx.ellipse(P.x + P.w/2, P.y + P.h + 6, 16, 6, 0, 0, Math.PI*2); ctx.fill();
+    // Body
+    ctx.fillStyle='#ff6b6b'; roundRect(P.x, P.y, P.w, P.h, 4); ctx.fill();
+    // Hat
+    ctx.fillStyle='#e74c3c'; ctx.fillRect(P.x-2, P.y-6, P.w+4, 6);
 
-    // UI overlay if game over
-    if(showGameOver){
+    // Game Over banner
+    if(showOver){
       ctx.fillStyle='rgba(0,0,0,.55)';
       ctx.fillRect(W/2-140, H/2-60, 280, 120);
       ctx.strokeStyle='#ffffff33'; ctx.strokeRect(W/2-140, H/2-60, 280, 120);
@@ -329,7 +214,11 @@
     }
   }
 
-  function bubble(x,y,r){ ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); }
+  function cloud(x,y,r){
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x+r*0.7,y+r*0.3,r*0.7,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x-r*0.7,y+r*0.35,r*0.6,0,Math.PI*2); ctx.fill();
+  }
   function roundRect(x,y,w,h,r){
     ctx.beginPath();
     ctx.moveTo(x+r,y);
@@ -340,14 +229,10 @@
     ctx.closePath();
   }
 
-  // restart by clicking/tapping canvas when not running
-  cv.addEventListener('pointerdown', ()=>{ if(!state.running) start(); });
-
-  // start loop
-  requestAnimationFrame(function loop(){ update(); });
-
-  // auto-start for quick test (comment this out if you prefer to press Enter)
-  // start();
+  // Kick off
+  requestAnimationFrame(update);
+  // Auto-start so it just works — comment this out if you want manual start
+  start();
 })();
 </script>
 </body>
