@@ -1,270 +1,302 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Shahroz’s Game</title>
-  <meta name="theme-color" content="#0b0f24" />
-  <meta name="description" content="One-thumb neon dodge & collect. Installable, offline, and fast." />
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 rx=%2716%27 fill=%27%230b0f24%27/%3E%3Ctext x=%2750%25%27 y=%2758%25%27 font-size=%2755%27 text-anchor=%27middle%27 fill=%27%237cffc4%27%3E💠%3C/text%3E%3C/svg%3E">
-  <style>
-    :root{
-      --bg1:#0b0f24; --bg2:#141a3a; --lane:#6cf; --accent:#7cffc4; --warn:#ff6b6b;
-      --panel:#ffffff12; --text:#eaf1ff;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%;margin:0;background:linear-gradient(135deg,var(--bg1),var(--bg2));color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;overscroll-behavior:none}
-    .wrap{max-width:480px;margin:0 auto;padding:12px}
-    #game{display:block;width:100%;height:auto;background:#0b0f24;border:1px solid #ffffff22;border-radius:20px;box-shadow:0 14px 40px rgba(0,0,0,.55)}
-    .hud{display:flex;justify-content:space-between;gap:8px;margin:8px 0 6px}
-    .pill{background:var(--panel);border:1px solid #ffffff26;border-radius:14px;padding:8px 12px;font-weight:800}
-    .btn{appearance:none;border:none;cursor:pointer;background:linear-gradient(135deg,#7cffc4,#6cf);color:#102;border-radius:14px;padding:10px 14px;font-weight:900;box-shadow:0 10px 24px rgba(0,0,0,.35)}
-    .btn:active{transform:scale(.98)}
-    .bar{position:relative;height:6px;background:#ffffff1a;border-radius:999px;overflow:hidden;margin-top:6px}
-    .bar>i{position:absolute;inset:0;width:0;background:linear-gradient(90deg,#7cffc4,#6cf)}
-    .credit{opacity:.8;text-align:center;font-size:12px;margin-top:6px}
-    #overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0a0c20cc;backdrop-filter:blur(8px);z-index:10}
-    .panel{background:#0c1128;border:1px solid #ffffff26;border-radius:16px;padding:16px;width:min(92vw,460px);text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.6)}
-    h1{margin:0 0 6px}
-    .muted{opacity:.9}
-    .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:12px}
-    /* touch joystick area hint */
-    .hint{font-size:12px;opacity:.8;text-align:center;margin:8px 0}
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Shahroz’s Neon Flight</title>
+<meta name="description" content="Tap to fly, dodge gates, set a high score. Created by Shahroz Khan.">
+<style>
+  :root{
+    --sky1:#0b1026; --sky2:#151c3d; --glow:#6cf; --accent:#7cffc4; --warn:#ff6b6b; --panel:#ffffff18; --text:#eaf1ff;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:linear-gradient(135deg,var(--sky1),var(--sky2));color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;overscroll-behavior:none;touch-action:manipulation}
+  .wrap{max-width:520px;margin:0 auto;padding:10px}
+  .topbar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0}
+  .pill{background:var(--panel);border:1px solid #ffffff26;border-radius:14px;padding:8px 12px;font-weight:800}
+  .btn{appearance:none;border:none;cursor:pointer;background:linear-gradient(135deg,#7cffc4,#6cf);color:#102;border-radius:14px;padding:10px 14px;font-weight:900;box-shadow:0 10px 24px rgba(0,0,0,.35)}
+  .btn:active{transform:scale(.98)}
+  #game{display:block;width:100%;height:auto;background:#0b0f24;border:1px solid #ffffff22;border-radius:20px;box-shadow:0 16px 46px rgba(0,0,0,.6)}
+  .credit{opacity:.8;text-align:center;font-size:12px;margin-top:6px}
+  /* Overlay */
+  #overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0a0c20cc;backdrop-filter:blur(8px);z-index:10}
+  .panel{background:#0c1128;border:1px solid #ffffff26;border-radius:16px;padding:18px;width:min(92vw,480px);text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+  h1{margin:0 0 6px}
+  .muted{opacity:.9}
+  .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+  /* On-screen Tap hint */
+  .hint{font-size:12px;opacity:.85;text-align:center;margin:8px 0}
+</style>
 </head>
 <body>
   <div class="wrap">
-    <div class="hud">
+    <div class="topbar">
       <div class="pill">Score: <span id="score">0</span></div>
       <div class="pill">Best: <span id="best">0</span></div>
       <button class="btn" id="pause">Pause</button>
     </div>
-    <canvas id="game" width="420" height="680" aria-label="Shahroz’s Game canvas"></canvas>
-    <div class="hint">Drag your thumb left/right to move • Tap to dash 💨 • Collect 🪙 • Avoid 🚧 • Shields 🛡️ save one hit</div>
-    <div class="credit">Created by <b>Shahroz Khan</b> • Install from browser menu to play offline</div>
+    <canvas id="game" width="450" height="720" aria-label="Shahroz’s Neon Flight"></canvas>
+    <div class="hint">Tap anywhere (or press Space) to fly • Pass through the glowing gates • Don’t hit walls</div>
+    <div class="credit">Created by <b>Shahroz Khan</b> ✨</div>
   </div>
 
   <!-- Overlay -->
   <div id="overlay">
     <div class="panel">
-      <h1>Shahroz’s Game</h1>
-      <p class="muted">One-thumb neon dash. Drag to move, tap to dash through one obstacle. Grab coins 🪙, shields 🛡️, magnets 🧲. Avoid hazards 🚧.</p>
-      <div class="bar"><i id="loadbar"></i></div>
+      <h1>Shahroz’s Neon Flight</h1>
+      <p class="muted">Tap to flap. Glide through the gaps. The faster you pass gates, the higher the bonus. Good luck!</p>
       <div class="row">
         <button class="btn" id="play">Play</button>
         <button class="btn" id="how">How to Play</button>
       </div>
-      <p id="howtext" class="muted" style="display:none;margin-top:8px">• Drag left/right anywhere on the game to move<br>• Single tap: instant short dash 💨 (phases one obstacle)<br>• Power-ups: 🛡️ shield, 🧲 magnet (pulls coins), 🐢 slow-mo</p>
+      <p id="howtext" class="muted" style="display:none;margin-top:8px">
+        • Tap/Click or press Space to flap up<br>
+        • Gravity pulls you down, keep a rhythm<br>
+        • Fly through neon gates to score (combo for speed)<br>
+        • Hitting walls or gate bars ends the run
+      </p>
     </div>
   </div>
 
-  <script>
-    // Register service worker for offline
-    if('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js'); }
+<script>
+(()=> {
+  // ---------- Canvas setup (crisp on phones) ----------
+  const cv = document.getElementById('game');
+  const ctx = cv.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const bestEl  = document.getElementById('best');
+  const pauseBtn= document.getElementById('pause');
+  const overlay = document.getElementById('overlay');
+  const playBtn = document.getElementById('play');
+  const howBtn  = document.getElementById('how');
+  const howTxt  = document.getElementById('howtext');
 
-    const cv = document.getElementById('game'), ctx = cv.getContext('2d');
-    const scoreEl = document.getElementById('score'), bestEl = document.getElementById('best');
-    const pauseBtn = document.getElementById('pause');
-    const overlay = document.getElementById('overlay');
-    const playBtn = document.getElementById('play');
-    const howBtn  = document.getElementById('how');
-    const howText = document.getElementById('howtext');
-    const loadbar = document.getElementById('loadbar');
+  // keep logical units while rendering sharp
+  function fitCanvas() {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const rect = cv.getBoundingClientRect();
+    cv.width  = Math.round(rect.width * dpr);
+    cv.height = Math.round(rect.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // scale drawing to CSS pixels
+  }
+  new ResizeObserver(fitCanvas).observe(cv);
+  fitCanvas();
 
-    // Simple loader bar animation
-    let lbw = 0; const lbTimer = setInterval(()=>{ lbw = Math.min(100, lbw+5); loadbar.style.width = lbw+'%'; if(lbw===100) clearInterval(lbTimer); }, 40);
+  // ---------- Game state ----------
+  const best = +localStorage.getItem('neon_best_fb') || 0;
+  bestEl.textContent = best;
 
-    // High score
-    const best = +localStorage.getItem('shahroz_best') || 0; bestEl.textContent = best;
+  const G = 0.5;         // gravity
+  const FLAP = -8.8;     // flap impulse
+  const MAX_ROT = 0.9;   // max tilt
+  const GAP_MIN = 140;   // min opening
+  const GAP_MAX = 190;   // max opening
+  const SPEED_START = 3.2;
+  const SPEED_MAX   = 6.2;
 
-    // Input: touch drag and tap for dash
-    const input = { x: cv.width/2, dragging:false, dash:false };
-    cv.addEventListener('pointerdown', (e)=>{ input.dragging=true; input.x = pos(e).x; input._tap = Date.now(); });
-    cv.addEventListener('pointermove', (e)=>{ if(input.dragging) input.x = pos(e).x; });
-    cv.addEventListener('pointerup',   (e)=>{ input.dragging=false; if(Date.now()-input._tap < 180) input.dash = true; });
-    function pos(e){ const r=cv.getBoundingClientRect(); return { x:(e.clientX-r.left)*cv.width/r.width, y:(e.clientY-r.top)*cv.height/r.height } }
+  const state = {
+    running:false, paused:false, gameOver:false,
+    t:0, score:0, combo:0, speed:SPEED_START,
+    bird:{ x: cv.width/2/ (window.devicePixelRatio||1), y: 360, vy: 0, r: 18, rot:0 },
+    pipes:[], // {x, top, bottom, w}
+    stars:[], // background parallax stars
+    lastPassTime:0
+  };
 
-    // Game state
-    const state = {
-      running:false, paused:false, t:0, scroll:0,
-      px: cv.width/2, py: cv.height-100, vx:0,
-      score:0, speed:3.6, maxSpeed:9, // increases over time
-      dash:0, dashCD:0, shield:0, magnet:0, slow:0,
-      items:[], particles:[],
-    };
+  // ---------- Input ----------
+  let justTapped=false;
+  function flap(){ state.bird.vy = FLAP; state.bird.rot = -MAX_ROT; }
+  cv.addEventListener('pointerdown', ()=>{ if(!state.running) return; justTapped=true; });
+  window.addEventListener('keydown', (e)=>{ if(e.code==='Space'){ e.preventDefault(); justTapped=true; } });
 
-    // Entities
-    function spawn(type, laneX){
-      state.items.push({ type, x: laneX, y:-30, r:16 });
+  // ---------- Helpers ----------
+  function rand(a,b){ return Math.random()*(b-a)+a }
+  function clamp(v,a,b){ return Math.max(a, Math.min(b,v)) }
+
+  function reset() {
+    state.running=true; state.paused=false; state.gameOver=false;
+    state.t=0; state.score=0; state.combo=0; state.speed=SPEED_START;
+    state.bird.x = cv.width/(window.devicePixelRatio||1)/2;
+    state.bird.y = 360; state.bird.vy=0; state.bird.rot=0;
+    state.pipes.length=0; spawnInitialPipes();
+    state.stars = Array.from({length:40},()=>({x:rand(0,cv.width), y:rand(0,cv.height), s:rand(0.5,1.8)}));
+    overlay.style.display='none';
+    scoreEl.textContent = "0";
+  }
+
+  function gameOver() {
+    state.running=false; state.gameOver=true;
+    const newBest = Math.max(best, state.score);
+    if(newBest !== best){ localStorage.setItem('neon_best_fb', newBest); bestEl.textContent = newBest; }
+    // show overlay
+    overlay.style.display='flex';
+    document.querySelector('#howtext').style.display='none';
+    overlay.querySelector('h1').textContent = 'Game Over';
+    overlay.querySelector('.muted').innerHTML = `Score: <b>${state.score}</b> &nbsp; Best: <b>${Math.max(best, state.score)}</b><br>Tap Play to try again.`;
+  }
+
+  // ---------- Pipes (gates) ----------
+  const laneXSpeed = ()=> state.speed;
+  function spawnPipe() {
+    const opening = rand(GAP_MIN, GAP_MAX);
+    const center  = rand(140, (cv.height/(window.devicePixelRatio||1)) - 140);
+    const w = 58;
+    state.pipes.push({
+      x: (cv.width/(window.devicePixelRatio||1)) + w,
+      top: center - opening/2,
+      bottom: center + opening/2,
+      w, passed:false
+    });
+  }
+  function spawnInitialPipes(){
+    let x = 260;
+    for(let i=0;i<5;i++){
+      const opening = rand(GAP_MIN, GAP_MAX);
+      const center  = rand(140, (cv.height/(window.devicePixelRatio||1)) - 140);
+      state.pipes.push({ x, top:center-opening/2, bottom:center+opening/2, w:58, passed:false });
+      x += 220;
     }
-    function spawnRow(){
-      const lanes = [cv.width*0.2, cv.width*0.5, cv.width*0.8];
-      // at least one obstacle or coin per row
-      const types = ['ob','coin','coin','ob','coin','shield','slow','mag']; // biased for coins
-      const count = 1 + Math.floor(Math.random()*2); // 1 or 2 items
-      for(let i=0;i<count;i++){
-        const lane = lanes.splice(Math.floor(Math.random()*lanes.length),1)[0];
-        const type = types[Math.floor(Math.random()*types.length)];
-        spawn(type, lane);
+  }
+
+  // ---------- Update ----------
+  function update(){
+    if(!state.running || state.paused){ render(); return; }
+    state.t++;
+
+    // flap
+    if(justTapped){ flap(); justTapped=false; }
+
+    // physics
+    state.bird.vy += G;
+    state.bird.vy = clamp(state.bird.vy, -12, 12);
+    state.bird.y += state.bird.vy;
+    state.bird.rot = clamp(state.bird.rot + 0.06, -MAX_ROT, MAX_ROT);
+
+    // move pipes
+    const spd = laneXSpeed();
+    for(const p of state.pipes){ p.x -= spd; }
+    // remove offscreen & spawn new
+    if(state.pipes.length && state.pipes[0].x + state.pipes[0].w < -10){ state.pipes.shift(); }
+    if(state.pipes.length<6){
+      const lastX = state.pipes[state.pipes.length-1]?.x || 260;
+      if(lastX < (cv.width/(window.devicePixelRatio||1)) - 220) spawnPipe();
+    }
+
+    // scoring + difficulty
+    for(const p of state.pipes){
+      if(!p.passed && p.x + p.w < state.bird.x - state.bird.r){
+        p.passed = true;
+        const now = performance.now();
+        const delta = state.lastPassTime ? now - state.lastPassTime : 1000;
+        state.lastPassTime = now;
+        // combo if quick pass
+        if(delta < 1200){ state.combo = Math.min(9, state.combo+1); }
+        else state.combo = 0;
+        const add = 1 + Math.floor(state.combo/3); // +1..+4
+        state.score += add;
+        scoreEl.textContent = state.score;
+        state.speed = Math.min(SPEED_MAX, state.speed + 0.05);
       }
     }
 
-    function start(){
-      state.running = true; state.paused = false; state.t = 0; state.scroll=0;
-      state.px = cv.width/2; state.vx = 0; state.score = 0; state.speed = 3.6;
-      state.dash=0; state.dashCD=0; state.shield=0; state.magnet=0; state.slow=0;
-      state.items.length = 0; state.particles.length = 0;
-      overlay.style.display = 'none';
-    }
-    function gameOver(){
-      state.running = false;
-      const newBest = Math.max(best, state.score);
-      if(newBest !== best){ localStorage.setItem('shahroz_best', newBest); bestEl.textContent = newBest; }
-      overlay.style.display = 'flex';
-      howText.style.display = 'none';
-      loadbar.style.width = '0%';
-      lbw = 0;
+    // collisions (walls)
+    const h = cv.height/(window.devicePixelRatio||1);
+    if(state.bird.y - state.bird.r < 0 || state.bird.y + state.bird.r > h){ gameOver(); return; }
+
+    // collisions (pipes)
+    for(const p of state.pipes){
+      const bx = state.bird.x, by = state.bird.y, r = state.bird.r;
+      // vertical bars
+      if(bx + r > p.x && bx - r < p.x + p.w){
+        if(by - r < p.top || by + r > p.bottom){ gameOver(); return; }
+      }
     }
 
-    // Particles
-    function emit(x,y,c='#7cffc4'){ for(let i=0;i<10;i++){ state.particles.push({x,y,vx:(Math.random()*2-1)*2,vy:(Math.random()*-2)-0.5,a:1,c}); } }
+    render();
+  }
 
-    // Loop
-    function update(){
-      if(!state.running || state.paused){ render(); return; }
-      state.t++;
-      const slowF = state.slow>0 ? 0.6 : 1;
-      if(state.slow>0) state.slow--;
-      state.speed = Math.min(state.maxSpeed, state.speed + 0.002);
+  // ---------- Render ----------
+  function render(){
+    const W = cv.width/(window.devicePixelRatio||1);
+    const H = cv.height/(window.devicePixelRatio||1);
 
-      // movement toward touch x (one-thumb control)
-      const target = input.dragging ? input.x : state.px;
-      const dx = target - state.px;
-      state.vx = dx * 0.18; // smoothing
-      state.px += state.vx;
+    // background sky
+    ctx.fillStyle = '#0b0f24';
+    ctx.fillRect(0,0,W,H);
 
-      // clamp
-      state.px = Math.max(40, Math.min(cv.width-40, state.px));
-
-      // dash
-      if(input.dash && state.dashCD<=0){
-        state.dash = 14;
-        state.dashCD = 90;
-        input.dash = false;
-      }
-      if(state.dash>0) state.dash--;
-      if(state.dashCD>0) state.dashCD--;
-
-      // spawn rows
-      if(state.t % Math.floor(42*slowF) === 0) spawnRow();
-
-      // move items
-      for(const it of state.items){
-        // magnet pulls coins
-        if(state.magnet>0 && it.type==='coin'){
-          const ang = Math.atan2(state.py - it.y, state.px - it.x);
-          it.x += Math.cos(ang)*1.5;
-          it.y += Math.sin(ang)*1.5;
-        }
-        it.y += state.speed*1.3*slowF;
-      }
-
-      // collisions & cleanup
-      for(let i=state.items.length-1;i>=0;i--){
-        const it = state.items[i];
-        if(it.y>cv.height+40){ state.items.splice(i,1); continue; }
-        const d = Math.hypot(it.x - state.px, it.y - state.py);
-        if(d < (it.r+20)){
-          if(it.type==='coin'){
-            state.score += 20;
-            emit(it.x,it.y,'#ffd166');
-            state.items.splice(i,1);
-          }else if(it.type==='shield'){
-            state.shield = 1; emit(it.x,it.y);
-            state.items.splice(i,1);
-          }else if(it.type==='slow'){
-            state.slow = 120; emit(it.x,it.y,'#6cf');
-            state.items.splice(i,1);
-          }else if(it.type==='mag'){
-            state.magnet = 220; emit(it.x,it.y,'#b6ff6b');
-            state.items.splice(i,1);
-          }else if(it.type==='ob'){
-            if(state.dash>0){ // phase through one obstacle
-              emit(state.px,state.py,'#fff'); state.items.splice(i,1);
-            } else if(state.shield>0){
-              state.shield = 0; emit(state.px,state.py,'#7cffc4'); state.items.splice(i,1);
-            } else {
-              gameOver(); return;
-            }
-          }
-        }
-      }
-
-      // score over time
-      state.score += Math.floor(state.speed*0.5);
-      scoreEl.textContent = state.score;
-
-      // particles fade
-      for(let i=state.particles.length-1;i>=0;i--){
-        const p = state.particles[i]; p.x+=p.vx; p.y+=p.vy; p.a-=0.02; if(p.a<=0) state.particles.splice(i,1);
-      }
-
-      render();
+    // parallax stars
+    for(const s of state.stars){
+      s.x -= state.speed * 0.2 * s.s;
+      if(s.x < -2) { s.x = W + 2; s.y = rand(0,H); }
+      ctx.globalAlpha = 0.5 + s.s*0.3;
+      ctx.fillStyle = '#6cf';
+      ctx.fillRect(s.x, s.y, 2, 2);
+      ctx.globalAlpha = 1;
     }
 
-    function render(){
-      // background
-      ctx.fillStyle = '#0b0f24'; ctx.fillRect(0,0,cv.width,cv.height);
-      // lane glow lines
-      ctx.strokeStyle='rgba(108,207,255,.25)'; ctx.lineWidth=2;
-      [cv.width*0.2, cv.width*0.5, cv.width*0.8].forEach(x=>{ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,cv.height); ctx.stroke(); });
+    // ground gradient
+    const g = ctx.createLinearGradient(0,H-120,0,H);
+    g.addColorStop(0,'#101633'); g.addColorStop(1,'#0b0f24');
+    ctx.fillStyle = g; ctx.fillRect(0,H-120,W,140);
 
-      // items
-      for(const it of state.items){
-        ctx.font = (it.type==='ob'?'28px':'26px')+' serif';
-        ctx.textAlign='center'; ctx.textBaseline='middle';
-        const em = it.type==='coin'?'🪙': it.type==='shield'?'🛡️': it.type==='slow'?'🐢': it.type==='mag'?'🧲':'🚧';
-        ctx.fillText(em, it.x, it.y);
-        if(it.type==='ob'){
-          ctx.strokeStyle='rgba(255,107,154,.25)'; ctx.strokeRect(it.x-18,it.y-18,36,36);
-        }
-      }
+    // pipes (neon)
+    for(const p of state.pipes){
+      // top bar
+      ctx.fillStyle = 'rgba(108,207,255,.18)';
+      ctx.fillRect(p.x, 0, p.w, p.top);
+      ctx.strokeStyle = 'rgba(108,207,255,.45)'; ctx.lineWidth=3;
+      ctx.strokeRect(p.x, p.top-6, p.w, 6);
 
-      // particles
-      for(const p of state.particles){
-        ctx.globalAlpha = Math.max(0,p.a); ctx.fillStyle = p.c; ctx.fillRect(p.x,p.y,2.5,2.5); ctx.globalAlpha=1;
-      }
+      // bottom bar
+      ctx.fillStyle = 'rgba(108,207,255,.18)';
+      ctx.fillRect(p.x, p.bottom, p.w, H-p.bottom);
+      ctx.strokeStyle = 'rgba(108,207,255,.45)'; ctx.lineWidth=3;
+      ctx.strokeRect(p.x, p.bottom, p.w, 6);
 
-      // player (disk + ring + state tints)
-      // shadow
-      ctx.fillStyle='rgba(124,255,196,0.08)';
-      ctx.beginPath(); ctx.ellipse(state.px, state.py+20, 22, 8, 0, 0, Math.PI*2); ctx.fill();
-      // body
-      ctx.fillStyle = state.shield ? '#7cffc4' : (state.magnet ? '#b6ff6b' : '#6cf');
-      ctx.beginPath(); ctx.arc(state.px, state.py, 20, 0, Math.PI*2); ctx.fill();
-      // ring
-      ctx.strokeStyle = state.dash>0 ? 'rgba(255,255,255,.6)' : (state.shield ? 'rgba(124,255,196,.6)' : (state.magnet? 'rgba(182,255,107,.6)' : 'rgba(108,207,255,.6)'));
-      ctx.lineWidth=3; ctx.beginPath(); ctx.arc(state.px, state.py, 24, 0, Math.PI*2); ctx.stroke();
+      // gate glow
+      ctx.strokeStyle='rgba(124,255,196,.28)'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(p.x, p.top); ctx.lineTo(p.x, p.bottom); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(p.x+p.w, p.top); ctx.lineTo(p.x+p.w, p.bottom); ctx.stroke();
     }
 
-    let raf; function loop(){ update(); raf=requestAnimationFrame(loop); } loop();
+    // bird (neon disc with tilt)
+    ctx.save();
+    ctx.translate(state.bird.x, state.bird.y);
+    ctx.rotate(state.bird.rot);
+    // shadow
+    ctx.fillStyle='rgba(124,255,196,.10)';
+    ctx.beginPath(); ctx.ellipse(0, 22, 18, 6, 0, 0, Math.PI*2); ctx.fill();
+    // body
+    ctx.fillStyle='#6cf';
+    ctx.beginPath(); ctx.arc(0,0, state.bird.r, 0, Math.PI*2); ctx.fill();
+    // ring
+    ctx.strokeStyle='rgba(108,207,255,.6)'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(0,0, state.bird.r+4, 0, Math.PI*2); ctx.stroke();
+    // beak-ish highlight
+    ctx.fillStyle='#7cffc4';
+    ctx.beginPath(); ctx.ellipse(8, -2, 6, 4, 0.2, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
 
-    // UI buttons
-    playBtn.onclick = start;
-    pauseBtn.onclick = ()=>{ if(!state.running) return; state.paused = !state.paused; pauseBtn.textContent = state.paused?'Resume':'Pause'; };
-    howBtn.onclick  = ()=>{ howText.style.display = howText.style.display ? '' : 'none'; };
+    // top HUD glow line (subtle)
+    ctx.strokeStyle='rgba(124,255,196,.12)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(10, 10); ctx.lineTo(W-10, 10); ctx.stroke();
+  }
 
-    // Resize canvas to device pixel ratio for sharpness
-    function fit(){
-      const dpr = Math.min(2, window.devicePixelRatio||1);
-      const r = cv.getBoundingClientRect();
-      cv.width = Math.round(r.width * dpr);
-      cv.height= Math.round(r.height* dpr);
-      ctx.setTransform(dpr,0,0,dpr,0,0); // keep logical coordinates
-    }
-    new ResizeObserver(fit).observe(cv);
-    fit();
-  </script>
+  // ---------- Loop ----------
+  let raf;
+  function loop(){ update(); raf=requestAnimationFrame(loop); }
+  raf=requestAnimationFrame(loop);
+
+  // ---------- UI ----------
+  pauseBtn.onclick = ()=> {
+    if(!state.running) return;
+    state.paused = !state.paused;
+    pauseBtn.textContent = state.paused ? 'Resume' : 'Pause';
+  };
+  playBtn.onclick = ()=> { overlay.querySelector('h1').textContent='Shahroz’s Neon Flight'; overlay.querySelector('.muted').textContent='Tap to flap • Fly through neon gates • Don’t crash.'; reset(); };
+  howBtn.onclick  = ()=> { howTxt.style.display = howTxt.style.display ? '' : 'block'; };
+
+})();
+</script>
 </body>
 </html>
